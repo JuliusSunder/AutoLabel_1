@@ -1,11 +1,38 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { getDatabase, closeDatabase } from './main/database/db';
+import { registerAllHandlers } from './main/ipc/handlers';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
+// Initialize database and IPC handlers when app is ready
+app.on('ready', () => {
+  console.log('[Main] App ready, initializing...');
+  
+  // Initialize database
+  try {
+    getDatabase();
+    console.log('[Main] Database initialized successfully');
+  } catch (error) {
+    console.error('[Main] Failed to initialize database:', error);
+  }
+
+  // Register IPC handlers
+  registerAllHandlers();
+
+  // Create main window
+  createWindow();
+});
+
+// Clean up on quit
+app.on('will-quit', () => {
+  console.log('App quitting, closing database...');
+  closeDatabase();
+});
 
 const createWindow = () => {
   // Create the browser window.
@@ -30,10 +57,7 @@ const createWindow = () => {
   mainWindow.webContents.openDevTools();
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+// Note: app.on('ready') is now at the top with initialization logic
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

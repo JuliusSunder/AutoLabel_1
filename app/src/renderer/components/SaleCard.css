@@ -1,0 +1,86 @@
+/**
+ * Sale Card Styles
+ */
+
+.sale-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 2px solid #ecf0f1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sale-card:hover {
+  border-color: #3498db;
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
+}
+
+.sale-card.selected {
+  border-color: #3498db;
+  background: #e8f4f8;
+}
+
+.sale-checkbox {
+  margin-top: 0.25rem;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.sale-content {
+  flex: 1;
+}
+
+.sale-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.sale-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #2c3e50;
+}
+
+.sale-platform {
+  padding: 0.25rem 0.75rem;
+  background: #3498db;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sale-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sale-detail {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.sale-detail-label {
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.sale-detail-value {
+  color: #2c3e50;
+}
+
+.sale-email-id {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+

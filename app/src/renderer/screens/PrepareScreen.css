@@ -1,0 +1,108 @@
+/**
+ * Prepare Screen Styles
+ */
+
+.prepare-screen {
+  /* Uses common screen styles from App.css */
+}
+
+.prepare-summary {
+  margin-bottom: 2rem;
+}
+
+.prepare-summary h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.prepare-summary p {
+  margin: 0;
+  color: #555;
+}
+
+.prepare-footer-config {
+  margin-bottom: 2rem;
+}
+
+.prepare-footer-config h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.prepare-footer-hint {
+  margin: 0 0 1rem 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.prepare-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.prepare-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.prepare-checkbox-label:hover {
+  background: #f8f9fa;
+}
+
+.prepare-checkbox-label input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.prepare-checkbox-label span {
+  font-size: 1rem;
+  color: #2c3e50;
+}
+
+.prepare-actions {
+  text-align: center;
+}
+
+.prepare-button {
+  font-size: 1.1rem;
+  padding: 1rem 2rem;
+  min-width: 200px;
+}
+
+.prepare-success {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.prepare-success p {
+  margin: 0.25rem 0;
+  color: #155724;
+}
+
+.prepare-hint {
+  font-size: 0.9rem;
+  color: #6c757d !important;
+  font-style: italic;
+}
+
+.prepare-error {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+  border-radius: 4px;
+  color: #721c24;
+  text-align: left;
+}
+

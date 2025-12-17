@@ -1,0 +1,81 @@
+/**
+ * Scan Screen Styles
+ */
+
+.scan-screen {
+  /* Uses common screen styles from App.css */
+}
+
+.scan-card {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.scan-description {
+  margin-bottom: 2rem;
+  color: #555;
+  line-height: 1.6;
+}
+
+.scan-button {
+  font-size: 1.1rem;
+  padding: 1rem 2rem;
+  min-width: 200px;
+}
+
+.scan-result {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid #ecf0f1;
+  text-align: left;
+}
+
+.scan-result h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.scan-result p {
+  margin: 0.5rem 0;
+  color: #555;
+}
+
+.scan-errors {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 4px;
+}
+
+.scan-errors ul {
+  margin: 0.5rem 0 0 1.5rem;
+  color: #856404;
+}
+
+.scan-error {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+  border-radius: 4px;
+  color: #721c24;
+  text-align: left;
+}
+
+.scan-info {
+  background: #e8f4f8;
+  border-left: 4px solid #3498db;
+}
+
+.scan-info h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.scan-info p {
+  margin: 0;
+  color: #555;
+  line-height: 1.6;
+}
+

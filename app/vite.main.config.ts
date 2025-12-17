@@ -1,4 +1,16 @@
 import { defineConfig } from 'vite';
 
 // https://vitejs.dev/config
-export default defineConfig({});
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      external: [
+        // Native modules that should not be bundled
+        'sharp',
+        'better-sqlite3',
+        'imap',
+        'mailparser',
+      ],
+    },
+  },
+});

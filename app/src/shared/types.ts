@@ -1,0 +1,179 @@
+/**
+ * Shared TypeScript types for AutoLabel
+ * Used across main, preload, and renderer processes
+ */
+
+// ============================================================================
+// Core Domain Models
+// ============================================================================
+
+export interface Sale {
+  id: string;
+  emailId: string; // For deduplication
+  date: string; // ISO date string
+  platform?: string; // e.g., "eBay", "Amazon", detected if possible
+  productNumber?: string;
+  itemTitle?: string;
+  buyerRef?: string;
+  metadata?: Record<string, any>; // Flexible storage for extra fields
+  createdAt: string; // ISO timestamp
+}
+
+export interface Attachment {
+  id: string;
+  saleId: string;
+  type: 'pdf' | 'image';
+  localPath: string;
+  sourceEmailId: string;
+}
+
+export interface PreparedLabel {
+  id: string;
+  saleId: string;
+  profileId: string; // e.g., "generic", "dhl", "hermes"
+  outputPath: string;
+  sizeMm: { width: number; height: number }; // Should be 100x150 for MVP
+  dpi: number; // Should be 300 for MVP
+  footerApplied: boolean;
+  footerConfig?: FooterConfig;
+  createdAt: string;
+}
+
+export interface PrintJob {
+  id: string;
+  printerName: string;
+  labelIds: string[];
+  status: 'pending' | 'printing' | 'completed' | 'failed';
+  printedCount: number;
+  totalCount: number;
+  errors?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================================================
+// Configuration Types
+// ============================================================================
+
+export interface FooterConfig {
+  includeProductNumber: boolean;
+  includeItemTitle: boolean;
+  includeDate: boolean;
+  includeBuyerRef: boolean;
+}
+
+export interface IMAPConfig {
+  host: string;
+  port: number;
+  username: string;
+  password: string; // Will be encrypted via safeStorage
+  tls: boolean;
+}
+
+export interface AppConfig {
+  imap?: IMAPConfig;
+  scanDays: number; // How many days back to scan (default: 30)
+  lastScanDate?: string;
+  defaultFooterConfig: FooterConfig;
+}
+
+// ============================================================================
+// API Response Types
+// ============================================================================
+
+export interface ScanResult {
+  scannedCount: number;
+  newSales: number;
+  errors?: string[];
+}
+
+export interface ScanStatus {
+  isScanning: boolean;
+  progress?: number; // 0-100
+  currentEmail?: string;
+}
+
+export interface PrinterInfo {
+  name: string;
+  isDefault: boolean;
+  status: string;
+}
+
+// ============================================================================
+// IPC API Interface (exposed via preload)
+// ============================================================================
+
+export interface AutoLabelAPI {
+  scan: {
+    start: () => Promise<ScanResult>;
+    status: () => Promise<ScanStatus>;
+  };
+  sales: {
+    list: (params: { fromDate?: string; toDate?: string }) => Promise<Sale[]>;
+    get: (id: string) => Promise<Sale | null>;
+  };
+  labels: {
+    prepare: (params: {
+      saleIds: string[];
+      footerConfig: FooterConfig;
+    }) => Promise<PreparedLabel[]>;
+  };
+  print: {
+    start: (params: {
+      labelIds: string[];
+      printerName?: string;
+    }) => Promise<PrintJob>;
+    status: (jobId: string) => Promise<PrintJob | null>;
+    listPrinters: () => Promise<PrinterInfo[]>;
+  };
+  config: {
+    get: () => Promise<AppConfig>;
+    set: (config: Partial<AppConfig>) => Promise<void>;
+  };
+}
+
+// ============================================================================
+// Database Row Types (internal to main process)
+// ============================================================================
+
+export interface SaleRow {
+  id: string;
+  email_id: string;
+  date: string;
+  platform: string | null;
+  product_number: string | null;
+  item_title: string | null;
+  buyer_ref: string | null;
+  metadata_json: string | null;
+  created_at: string;
+}
+
+export interface AttachmentRow {
+  id: string;
+  sale_id: string;
+  type: string;
+  local_path: string;
+  source_email_id: string;
+}
+
+export interface PreparedLabelRow {
+  id: string;
+  sale_id: string;
+  profile_id: string;
+  output_path: string;
+  size_mm: string; // JSON: {width, height}
+  dpi: number;
+  footer_config: string | null; // JSON
+  created_at: string;
+}
+
+export interface PrintJobRow {
+  id: string;
+  printer_name: string;
+  status: string;
+  printed_count: number;
+  total_count: number;
+  errors_json: string | null;
+  created_at: string;
+  updated_at: string;
+}

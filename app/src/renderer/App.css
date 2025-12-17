@@ -1,0 +1,142 @@
+/**
+ * Main App Styles
+ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-nav {
+  background: #2c3e50;
+  color: white;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.app-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.app-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.app-tabs button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.app-tabs button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.app-tabs button.active {
+  background: rgba(255, 255, 255, 0.3);
+  font-weight: 600;
+}
+
+.app-tabs button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  background: #ecf0f1;
+}
+
+/* Common screen styles */
+.screen {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.screen-title {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #2c3e50;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #7f8c8d;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state-text {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-hint {
+  font-size: 0.9rem;
+  color: #95a5a6;
+}
+
+/* Button styles */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.btn-success {
+  background: #2ecc71;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #27ae60;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Card styles */
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card + .card {
+  margin-top: 1rem;
+}

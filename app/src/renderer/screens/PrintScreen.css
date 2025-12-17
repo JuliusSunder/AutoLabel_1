@@ -1,0 +1,98 @@
+/**
+ * Print Screen Styles
+ */
+
+.print-screen {
+  /* Uses common screen styles from App.css */
+}
+
+.print-printers {
+  margin-bottom: 2rem;
+}
+
+.print-printers h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.print-hint {
+  margin: 0;
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.print-error {
+  padding: 1rem;
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+  border-radius: 4px;
+  color: #721c24;
+}
+
+.print-error p {
+  margin: 0 0 1rem 0;
+}
+
+.print-printer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.print-printer-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.print-printer-item:last-child {
+  border-bottom: none;
+}
+
+.print-printer-name {
+  flex: 1;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.print-printer-badge {
+  padding: 0.25rem 0.75rem;
+  background: #3498db;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.print-printer-status {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.print-queue {
+  margin-bottom: 2rem;
+}
+
+.print-queue h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.print-info {
+  background: #e8f4f8;
+  border-left: 4px solid #3498db;
+}
+
+.print-info h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.print-info p {
+  margin: 0;
+  color: #555;
+  line-height: 1.6;
+}
+
