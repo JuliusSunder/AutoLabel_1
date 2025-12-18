@@ -21,6 +21,10 @@ export function App() {
     setCurrentScreen('prepare');
   };
 
+  const handleRemoveSale = (saleId: string) => {
+    setSelectedSaleIds((prev) => prev.filter((id) => id !== saleId));
+  };
+
   return (
     <div className="app">
       <nav className="app-nav">
@@ -60,7 +64,10 @@ export function App() {
           <HistoryScreen onSelectSales={handleSelectSales} />
         )}
         {currentScreen === 'prepare' && (
-          <PrepareScreen selectedSaleIds={selectedSaleIds} />
+          <PrepareScreen 
+            selectedSaleIds={selectedSaleIds} 
+            onRemoveSale={handleRemoveSale}
+          />
         )}
         {currentScreen === 'print' && <PrintScreen />}
       </main>

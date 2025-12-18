@@ -9,6 +9,7 @@ export interface ParsedSale {
   emailId: string;
   date: string; // ISO date
   platform?: string;
+  shippingCompany?: string;
   productNumber?: string;
   itemTitle?: string;
   buyerRef?: string;
@@ -99,10 +100,18 @@ function extractItemTitle(text: string): string | undefined {
     }
   }
 
-  // Fallback: use first line of subject if it's descriptive
-  const subject = text.split('\n')[0];
-  if (subject.length > 10 && subject.length < 100) {
-    return subject.trim();
+  // Fallback: use first line (email subject) as title
+  const subject = text.split('\n')[0]?.trim();
+  if (subject && subject.length > 0) {
+    // Clean up common email prefixes
+    const cleaned = subject
+      .replace(/^(Re:|Fwd?:|AW:|WG:)\s*/gi, '')
+      .replace(/^\[.*?\]\s*/, '')
+      .trim();
+    
+    if (cleaned.length > 0) {
+      return cleaned;
+    }
   }
 
   return undefined;
@@ -158,6 +167,39 @@ function detectPlatform(email: EmailMessage): string | undefined {
 }
 
 /**
+ * Detect shipping company from email content and attachments
+ */
+function detectShippingCompany(email: EmailMessage): string | undefined {
+  const from = email.from.toLowerCase();
+  const subject = email.subject.toLowerCase();
+  const body = email.body.toLowerCase();
+  
+  // Check attachment filenames
+  const attachmentNames = email.attachments
+    .map(att => att.filename.toLowerCase())
+    .join(' ');
+
+  const allText = `${from} ${subject} ${body} ${attachmentNames}`;
+
+  // Shipping companies with their indicators (most specific first)
+  const companies: Record<string, string[]> = {
+    DHL: ['dhl', 'dhl.de', 'dhl.com', 'deutsche post'],
+    Hermes: ['hermes', 'myhermes', 'hermesworld'],
+    DPD: ['dpd', 'dpd.de', 'dpd.com'],
+    GLS: ['gls', 'gls-group', 'gls.de'],
+    UPS: ['ups.com', 'ups.de', 'united parcel'],
+  };
+
+  for (const [company, indicators] of Object.entries(companies)) {
+    if (indicators.some(ind => allText.includes(ind))) {
+      return company;
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Parse sale metadata from email
  */
 export function parseSaleFromEmail(email: EmailMessage): ParsedSale {
@@ -167,6 +209,7 @@ export function parseSaleFromEmail(email: EmailMessage): ParsedSale {
     emailId: email.messageId,
     date: email.date.toISOString().split('T')[0], // YYYY-MM-DD
     platform: detectPlatform(email),
+    shippingCompany: detectShippingCompany(email),
     productNumber: extractProductNumber(combinedText),
     itemTitle: extractItemTitle(email.subject) || extractItemTitle(email.body),
     buyerRef: extractBuyerRef(combinedText),

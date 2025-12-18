@@ -140,6 +140,22 @@ export function runMigrations(db: Database.Database): void {
     db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(1);
   }
 
+  // Migration 2: Add shipping_company column to sales table
+  if (version < 2) {
+    // Check if column already exists (safe migration)
+    const tableInfo = db.pragma('table_info(sales)');
+    const hasShippingCompany = tableInfo.some(
+      (col: any) => col.name === 'shipping_company'
+    );
+    
+    if (!hasShippingCompany) {
+      db.exec('ALTER TABLE sales ADD COLUMN shipping_company TEXT');
+      console.log('[Schema] Added shipping_company column to sales table');
+    }
+    
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(2);
+  }
+
   // Future migrations go here:
-  // if (version < 2) { ... }
+  // if (version < 3) { ... }
 }

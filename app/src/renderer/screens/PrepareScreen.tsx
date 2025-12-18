@@ -3,17 +3,19 @@
  * Configure footer and prepare labels for printing
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
-import type { FooterConfig } from '../../shared/types';
+import type { FooterConfig, Sale } from '../../shared/types';
 import './PrepareScreen.css';
 
 interface PrepareScreenProps {
   selectedSaleIds: string[];
+  onRemoveSale?: (saleId: string) => void;
 }
 
-export function PrepareScreen({ selectedSaleIds }: PrepareScreenProps) {
+export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenProps) {
   const api = useAutolabel();
+  const [sales, setSales] = useState<Sale[]>([]);
   const [footerConfig, setFooterConfig] = useState<FooterConfig>({
     includeProductNumber: true,
     includeItemTitle: false,
@@ -24,6 +26,30 @@ export function PrepareScreen({ selectedSaleIds }: PrepareScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [preparedLabels, setPreparedLabels] = useState<any[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
+
+  // Load sale details when selectedSaleIds change
+  useEffect(() => {
+    const loadSales = async () => {
+      const loadedSales: Sale[] = [];
+      for (const saleId of selectedSaleIds) {
+        try {
+          const sale = await api.sales.get(saleId);
+          if (sale) {
+            loadedSales.push(sale);
+          }
+        } catch (err) {
+          console.error(`Failed to load sale ${saleId}:`, err);
+        }
+      }
+      setSales(loadedSales);
+    };
+
+    if (selectedSaleIds.length > 0) {
+      loadSales();
+    } else {
+      setSales([]);
+    }
+  }, [selectedSaleIds]);
 
   const handleToggleField = (field: keyof FooterConfig) => {
     setFooterConfig((prev) => ({
@@ -95,6 +121,29 @@ export function PrepareScreen({ selectedSaleIds }: PrepareScreenProps) {
         <p>
           <strong>{selectedSaleIds.length}</strong> sale(s) selected for label preparation
         </p>
+        {sales.length > 0 && (
+          <div className="selected-sales-list">
+            {sales.map((sale) => (
+              <div key={sale.id} className="selected-sale-item">
+                <div className="selected-sale-info">
+                  <strong>{sale.itemTitle || 'Untitled Sale'}</strong>
+                  {sale.shippingCompany && <span className="sale-shipping-badge">{sale.shippingCompany}</span>}
+                  {sale.platform && <span className="sale-platform-badge">{sale.platform}</span>}
+                  {sale.productNumber && <span className="sale-product-number">#{sale.productNumber}</span>}
+                </div>
+                {onRemoveSale && (
+                  <button
+                    className="btn btn-small btn-danger"
+                    onClick={() => onRemoveSale(sale.id)}
+                    title="Remove from selection"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card prepare-footer-config">
@@ -152,18 +201,64 @@ export function PrepareScreen({ selectedSaleIds }: PrepareScreenProps) {
         </button>
 
         {preparedLabels.length > 0 && (
-          <div className="prepare-success">
-            <p>
-              ✅ Successfully prepared <strong>{preparedLabels.length}</strong> label(s)!
-            </p>
-            <button
-              className="btn btn-success"
-              onClick={handlePrint}
-              disabled={isPrinting}
-            >
-              {isPrinting ? 'Starting Print...' : '🖨️ Print Now'}
-            </button>
-          </div>
+          <>
+            <div className="prepare-success">
+              <p>
+                ✅ Successfully prepared <strong>{preparedLabels.length}</strong> label(s)!
+              </p>
+              <button
+                className="btn btn-success"
+                onClick={handlePrint}
+                disabled={isPrinting}
+              >
+                {isPrinting ? 'Starting Print...' : '🖨️ Print Now'}
+              </button>
+            </div>
+            
+            <div className="prepare-preview">
+              <h4>Label Preview</h4>
+              <p className="prepare-preview-hint">
+                Preview of prepared labels with footer applied:
+              </p>
+              <div className="prepare-preview-grid">
+                {preparedLabels.map((label, index) => {
+                  const sale = sales.find(s => s.id === label.saleId);
+                  return (
+                    <div key={label.id} className="prepare-preview-item">
+                      <div className="preview-label-number">Label {index + 1}</div>
+                      {sale && (
+                        <div className="preview-sale-info">
+                          <strong>{sale.itemTitle || 'Untitled Sale'}</strong>
+                          {sale.shippingCompany && (
+                            <span className="preview-shipping-badge">{sale.shippingCompany}</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="preview-file-info">
+                        <span className="preview-file-type">
+                          {label.outputPath.endsWith('.pdf') ? '📄 PDF' : '🖼️ Image'}
+                        </span>
+                        <span className="preview-file-size">
+                          {label.sizeMm.width}×{label.sizeMm.height}mm @ {label.dpi}dpi
+                        </span>
+                      </div>
+                      {footerConfig && (
+                        <div className="preview-footer-info">
+                          <strong>Footer fields:</strong>
+                          <ul>
+                            {footerConfig.includeProductNumber && <li>Product Number</li>}
+                            {footerConfig.includeItemTitle && <li>Item Title</li>}
+                            {footerConfig.includeDate && <li>Date</li>}
+                            {footerConfig.includeBuyerRef && <li>Buyer Reference</li>}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
 
         {error && (

@@ -39,7 +39,12 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     }
   };
 
-  const toggleSelection = (id: string) => {
+  const toggleSelection = (id: string, hasAttachments: boolean) => {
+    // Don't allow selection if sale has no attachments
+    if (!hasAttachments) {
+      return;
+    }
+    
     const newSelection = new Set(selectedIds);
     if (newSelection.has(id)) {
       newSelection.delete(id);
@@ -144,7 +149,8 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                   key={sale.id}
                   sale={sale}
                   selected={selectedIds.has(sale.id)}
-                  onToggleSelect={() => toggleSelection(sale.id)}
+                  onToggleSelect={() => toggleSelection(sale.id, sale.hasAttachments || false)}
+                  disabled={!sale.hasAttachments}
                 />
               ))}
             </div>

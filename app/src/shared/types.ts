@@ -12,11 +12,13 @@ export interface Sale {
   emailId: string; // For deduplication
   date: string; // ISO date string
   platform?: string; // e.g., "eBay", "Amazon", detected if possible
+  shippingCompany?: string; // e.g., "DHL", "Hermes", "DPD", "GLS", "UPS"
   productNumber?: string;
   itemTitle?: string;
   buyerRef?: string;
   metadata?: Record<string, any>; // Flexible storage for extra fields
   createdAt: string; // ISO timestamp
+  hasAttachments?: boolean; // Whether sale has label attachments
 }
 
 export interface Attachment {
@@ -141,6 +143,7 @@ export interface SaleRow {
   email_id: string;
   date: string;
   platform: string | null;
+  shipping_company: string | null;
   product_number: string | null;
   item_title: string | null;
   buyer_ref: string | null;

@@ -15,6 +15,7 @@ function rowToSale(row: SaleRow): Sale {
     emailId: row.email_id,
     date: row.date,
     platform: row.platform || undefined,
+    shippingCompany: row.shipping_company || undefined,
     productNumber: row.product_number || undefined,
     itemTitle: row.item_title || undefined,
     buyerRef: row.buyer_ref || undefined,
@@ -33,9 +34,9 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
 
   const stmt = db.prepare(`
     INSERT INTO sales (
-      id, email_id, date, platform, product_number, 
+      id, email_id, date, platform, shipping_company, product_number, 
       item_title, buyer_ref, metadata_json, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -43,6 +44,7 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
     data.emailId,
     data.date,
     data.platform || null,
+    data.shippingCompany || null,
     data.productNumber || null,
     data.itemTitle || null,
     data.buyerRef || null,
@@ -85,24 +87,37 @@ export function listSales(params: {
   toDate?: string;
 }): Sale[] {
   const db = getDatabase();
-  let query = 'SELECT * FROM sales WHERE 1=1';
+  let query = `
+    SELECT 
+      s.*,
+      (SELECT COUNT(*) FROM attachments WHERE sale_id = s.id) as attachment_count
+    FROM sales s 
+    WHERE 1=1
+  `;
   const queryParams: any[] = [];
 
   if (params.fromDate) {
-    query += ' AND date >= ?';
+    query += ' AND s.date >= ?';
     queryParams.push(params.fromDate);
   }
 
   if (params.toDate) {
-    query += ' AND date <= ?';
+    query += ' AND s.date <= ?';
     queryParams.push(params.toDate);
   }
 
-  query += ' ORDER BY date DESC, created_at DESC';
+  query += ' ORDER BY s.date DESC, s.created_at DESC';
 
   const stmt = db.prepare(query);
-  const rows = stmt.all(...queryParams) as SaleRow[];
-  return rows.map(rowToSale);
+  const rows = stmt.all(...queryParams) as (SaleRow & { attachment_count: number })[];
+  
+  return rows.map(row => {
+    const sale = rowToSale(row);
+    return {
+      ...sale,
+      hasAttachments: row.attachment_count > 0,
+    };
+  });
 }
 
 /**

@@ -11,22 +11,26 @@ interface SaleCardProps {
   sale: Sale;
   selected: boolean;
   onToggleSelect: () => void;
+  disabled?: boolean;
 }
 
-export function SaleCard({ sale, selected, onToggleSelect }: SaleCardProps) {
+export function SaleCard({ sale, selected, onToggleSelect, disabled }: SaleCardProps) {
   return (
-    <div className={`sale-card ${selected ? 'selected' : ''}`}>
+    <div className={`sale-card ${selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}>
       <input
         type="checkbox"
         className="sale-checkbox"
         checked={selected}
         onChange={onToggleSelect}
+        disabled={disabled}
+        title={disabled ? 'No shipping label attached to this sale' : ''}
       />
 
       <div className="sale-content">
         <div className="sale-header">
           <h4 className="sale-title">
             {sale.itemTitle || 'Untitled Sale'}
+            {disabled && <span className="no-label-indicator"> (No Label)</span>}
           </h4>
           {sale.platform && (
             <span className="sale-platform">{sale.platform}</span>

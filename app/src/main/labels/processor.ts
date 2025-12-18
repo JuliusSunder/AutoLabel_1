@@ -63,57 +63,60 @@ export async function prepareLabels(
         continue;
       }
 
-      // Process each attachment
-      for (const attachment of attachments) {
-        try {
-          console.log(`[Processor] Processing attachment: ${attachment.id}`);
+      // Select only ONE attachment per sale (prefer PDF over images)
+      const selectedAttachment = 
+        attachments.find(att => att.type === 'pdf') || attachments[0];
+      
+      console.log(`[Processor] Processing ${attachments.length} attachment(s) found, using: ${selectedAttachment.id}`);
 
-          // Step 1: Normalize to 100×150mm
-          const normalized = await normalizeLabel(attachment.localPath);
+      try {
+        console.log(`[Processor] Processing attachment: ${selectedAttachment.id}`);
 
-          // Step 2: Add footer
-          const finalFilename = `label_${Date.now()}_${saleId}.${
-            attachment.type === 'pdf' ? 'pdf' : 'png'
-          }`;
-          const finalPath = path.join(getPreparedDir(), finalFilename);
+        // Step 1: Normalize to 100×150mm
+        const normalized = await normalizeLabel(selectedAttachment.localPath);
 
-          await addFooter(
-            normalized.outputPath,
-            finalPath,
-            sale,
-            footerConfig
-          );
+        // Step 2: Add footer
+        const finalFilename = `label_${Date.now()}_${saleId}.${
+          selectedAttachment.type === 'pdf' ? 'pdf' : 'png'
+        }`;
+        const finalPath = path.join(getPreparedDir(), finalFilename);
 
-          // Clean up temp file
-          if (fs.existsSync(normalized.outputPath)) {
-            fs.unlinkSync(normalized.outputPath);
-          }
+        await addFooter(
+          normalized.outputPath,
+          finalPath,
+          sale,
+          footerConfig
+        );
 
-          // Step 3: Save to database
-          const preparedLabel = labelsRepo.createPreparedLabel({
-            saleId: sale.id,
-            profileId: normalized.profileId,
-            outputPath: finalPath,
-            sizeMm: { width: TARGET_SIZE_MM.width, height: TARGET_SIZE_MM.height },
-            dpi: TARGET_DPI,
-            footerApplied: true,
-            footerConfig,
-          });
-
-          preparedLabels.push(preparedLabel);
-
-          console.log(`[Processor] Prepared label: ${preparedLabel.id}`);
-        } catch (error) {
-          console.error(
-            `[Processor] Error processing attachment ${attachment.id}:`,
-            error
-          );
-          errors.push(
-            `Failed to process attachment ${attachment.id}: ${
-              error instanceof Error ? error.message : 'Unknown error'
-            }`
-          );
+        // Clean up temp file
+        if (fs.existsSync(normalized.outputPath)) {
+          fs.unlinkSync(normalized.outputPath);
         }
+
+        // Step 3: Save to database
+        const preparedLabel = labelsRepo.createPreparedLabel({
+          saleId: sale.id,
+          profileId: normalized.profileId,
+          outputPath: finalPath,
+          sizeMm: { width: TARGET_SIZE_MM.width, height: TARGET_SIZE_MM.height },
+          dpi: TARGET_DPI,
+          footerApplied: true,
+          footerConfig,
+        });
+
+        preparedLabels.push(preparedLabel);
+
+        console.log(`[Processor] Prepared label: ${preparedLabel.id}`);
+      } catch (error) {
+        console.error(
+          `[Processor] Error processing attachment ${selectedAttachment.id}:`,
+          error
+        );
+        errors.push(
+          `Failed to process attachment ${selectedAttachment.id}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`
+        );
       }
     } catch (error) {
       console.error(`[Processor] Error processing sale ${saleId}:`, error);

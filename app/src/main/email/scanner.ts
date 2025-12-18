@@ -84,6 +84,7 @@ export async function scanMailbox(): Promise<ScanResult> {
             emailId: parsedSale.emailId,
             date: parsedSale.date,
             platform: parsedSale.platform,
+            shippingCompany: parsedSale.shippingCompany,
             productNumber: parsedSale.productNumber,
             itemTitle: parsedSale.itemTitle,
             buyerRef: parsedSale.buyerRef,
