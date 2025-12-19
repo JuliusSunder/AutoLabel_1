@@ -11,6 +11,7 @@ const autolabelAPI: AutoLabelAPI = {
   scan: {
     start: () => ipcRenderer.invoke('scan:start'),
     status: () => ipcRenderer.invoke('scan:status'),
+    refreshVinted: () => ipcRenderer.invoke('scan:refreshVinted'),
   },
   sales: {
     list: (params) => ipcRenderer.invoke('sales:list', params),
@@ -18,6 +19,10 @@ const autolabelAPI: AutoLabelAPI = {
   },
   labels: {
     prepare: (params) => ipcRenderer.invoke('labels:prepare', params),
+    getThumbnail: (pdfPath) => ipcRenderer.invoke('labels:getThumbnail', pdfPath),
+  },
+  attachments: {
+    getBySale: (saleId) => ipcRenderer.invoke('attachments:getBySale', saleId),
   },
   print: {
     start: (params) => ipcRenderer.invoke('print:start', params),

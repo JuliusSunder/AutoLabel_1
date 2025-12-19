@@ -128,13 +128,31 @@ export class ImapClient {
           try {
             const parsed = await simpleParser(buffer);
 
+            // Extract body text - prefer plain text, fallback to HTML with tags stripped
+            let bodyText = parsed.text || '';
+            if (!bodyText && parsed.html) {
+              // Convert HTML to plain text by removing tags
+              bodyText = parsed.html
+                .toString()
+                .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove style tags
+                .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove script tags
+                .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
+                .replace(/&nbsp;/g, ' ') // Replace &nbsp;
+                .replace(/&amp;/g, '&') // Replace &amp;
+                .replace(/&lt;/g, '<') // Replace &lt;
+                .replace(/&gt;/g, '>') // Replace &gt;
+                .replace(/\s+/g, ' ') // Collapse multiple spaces
+                .trim();
+              console.log('[IMAP] Converted HTML to text (length:', bodyText.length, 'chars)');
+            }
+
             const emailMessage: EmailMessage = {
               uid,
               messageId: parsed.messageId || `uid-${uid}`,
               subject: parsed.subject || '(No Subject)',
               from: parsed.from?.text || '(Unknown)',
               date: parsed.date || new Date(),
-              body: parsed.text || '',
+              body: bodyText,
               html: parsed.html || undefined,
               attachments: (parsed.attachments || []).map((att) => ({
                 filename: att.filename || 'untitled',

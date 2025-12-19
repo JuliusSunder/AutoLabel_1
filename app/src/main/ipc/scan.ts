@@ -4,7 +4,7 @@
  */
 
 import { ipcMain } from 'electron';
-import { scanMailbox } from '../email/scanner';
+import { scanMailbox, refreshVintedSales } from '../email/scanner';
 import type { ScanResult, ScanStatus } from '../../shared/types';
 
 let isScanning = false;
@@ -52,6 +52,25 @@ export function registerScanHandlers(): void {
       progress: scanProgress,
     };
   });
+
+  // Refresh Vinted sales (new simplified scan)
+  ipcMain.handle('scan:refreshVinted', async (): Promise<ScanResult> => {
+    console.log('[IPC] scan:refreshVinted called');
+
+    try {
+      const result = await refreshVintedSales();
+      console.log('[IPC] Vinted refresh complete:', result);
+      return result;
+    } catch (error) {
+      console.error('[IPC] Vinted refresh failed:', error);
+      return {
+        scannedCount: 0,
+        newSales: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error'],
+      };
+    }
+  });
+
 }
 
 /**

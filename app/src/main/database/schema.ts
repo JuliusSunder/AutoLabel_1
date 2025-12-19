@@ -49,6 +49,7 @@ export function initializeSchema(db: Database.Database): void {
       type TEXT NOT NULL CHECK(type IN ('pdf', 'image')),
       local_path TEXT NOT NULL,
       source_email_id TEXT NOT NULL,
+      original_filename TEXT,
       FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
     )
   `);
@@ -156,6 +157,159 @@ export function runMigrations(db: Database.Database): void {
     db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(2);
   }
 
+  // Migration 3: Populate shipping_company from metadata for existing sales
+  if (version < 3) {
+    console.log('[Schema] Populating shipping_company from metadata...');
+    
+    // Get all sales with metadata but no shipping_company
+    const sales = db.prepare(`
+      SELECT id, metadata_json 
+      FROM sales 
+      WHERE shipping_company IS NULL 
+      AND metadata_json IS NOT NULL
+    `).all() as Array<{ id: string; metadata_json: string }>;
+    
+    const updateStmt = db.prepare('UPDATE sales SET shipping_company = ? WHERE id = ?');
+    
+    for (const sale of sales) {
+      try {
+        const metadata = JSON.parse(sale.metadata_json);
+        const subject = (metadata.subject || '').toLowerCase();
+        const from = (metadata.from || '').toLowerCase();
+        const allText = `${subject} ${from}`;
+        
+        // Detect shipping company from metadata
+        let shippingCompany: string | null = null;
+        
+        if (allText.includes('myhermes') || allText.includes('hermes')) {
+          shippingCompany = 'Hermes';
+        } else if (allText.includes('dhl')) {
+          shippingCompany = 'DHL';
+        } else if (allText.includes('dpd')) {
+          shippingCompany = 'DPD';
+        } else if (allText.includes('gls')) {
+          shippingCompany = 'GLS';
+        } else if (allText.includes('ups')) {
+          shippingCompany = 'UPS';
+        }
+        
+        if (shippingCompany) {
+          updateStmt.run(shippingCompany, sale.id);
+          console.log(`[Schema] Updated sale ${sale.id} with shipping company: ${shippingCompany}`);
+        }
+      } catch (err) {
+        console.error(`[Schema] Failed to update sale ${sale.id}:`, err);
+      }
+    }
+    
+    console.log(`[Schema] Updated ${sales.length} sales with shipping company data`);
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(3);
+  }
+
+  // Migration 4: Add original_filename column to attachments table
+  if (version < 4) {
+    console.log('[Schema] Adding original_filename column to attachments table...');
+    
+    // Check if column already exists (safe migration)
+    const tableInfo = db.pragma('table_info(attachments)');
+    const hasOriginalFilename = tableInfo.some(
+      (col: any) => col.name === 'original_filename'
+    );
+    
+    if (!hasOriginalFilename) {
+      db.exec('ALTER TABLE attachments ADD COLUMN original_filename TEXT');
+      console.log('[Schema] Added original_filename column to attachments table');
+    }
+    
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(4);
+  }
+
+  // Migration 5: Populate attachment metadata from filename analysis
+  if (version < 5) {
+    console.log('[Schema] Analyzing attachment filenames for shipping company detection...');
+    
+    // Get all sales with attachments but no shipping company
+    const salesWithAttachments = db.prepare(`
+      SELECT DISTINCT s.id, s.platform, s.metadata_json
+      FROM sales s
+      INNER JOIN attachments a ON a.sale_id = s.id
+      WHERE s.shipping_company IS NULL
+      AND a.original_filename IS NOT NULL
+    `).all() as Array<{ id: string; platform: string | null; metadata_json: string | null }>;
+    
+    const updateStmt = db.prepare('UPDATE sales SET shipping_company = ? WHERE id = ?');
+    let updated = 0;
+    
+    for (const sale of salesWithAttachments) {
+      try {
+        // Get attachments for this sale
+        const attachments = db.prepare('SELECT original_filename FROM attachments WHERE sale_id = ?')
+          .all(sale.id) as Array<{ original_filename: string | null }>;
+        
+        // Check filenames for shipping company indicators
+        const allFilenames = attachments
+          .map(a => (a.original_filename || '').toLowerCase())
+          .join(' ');
+        
+        let metadata: any = {};
+        try {
+          metadata = sale.metadata_json ? JSON.parse(sale.metadata_json) : {};
+        } catch {}
+        
+        const subject = (metadata.subject || '').toLowerCase();
+        const from = (metadata.from || '').toLowerCase();
+        const allText = `${from} ${subject} ${allFilenames}`;
+        
+        // Detect shipping company
+        let shippingCompany: string | null = null;
+        
+        // Special handling for Vinted - check for carrier mentions
+        // Vinted includes carrier name in subject or attachment filename
+        if ((sale.platform === 'Vinted/Kleiderkreisel' || from.includes('vinted')) && !shippingCompany) {
+          // Check if filename or subject mentions specific carriers
+          if (allText.includes('hermes') || allText.includes('myhermes')) {
+            shippingCompany = 'Hermes';
+          } else if (allText.includes('dhl')) {
+            shippingCompany = 'DHL';
+          } else if (allText.includes('dpd')) {
+            shippingCompany = 'DPD';
+          } else if (allText.includes('gls')) {
+            shippingCompany = 'GLS';
+          } else if (allText.includes('ups')) {
+            shippingCompany = 'UPS';
+          }
+          // No default - if carrier not detected, leave as null
+        }
+        
+        // General detection for other platforms
+        if (!shippingCompany) {
+          if (allText.includes('myhermes') || allText.includes('hermes')) {
+            shippingCompany = 'Hermes';
+          } else if (allText.includes('dhl')) {
+            shippingCompany = 'DHL';
+          } else if (allText.includes('dpd')) {
+            shippingCompany = 'DPD';
+          } else if (allText.includes('gls')) {
+            shippingCompany = 'GLS';
+          } else if (allText.includes('ups')) {
+            shippingCompany = 'UPS';
+          }
+        }
+        
+        if (shippingCompany) {
+          updateStmt.run(shippingCompany, sale.id);
+          updated++;
+          console.log(`[Schema] Detected ${shippingCompany} for sale ${sale.id}`);
+        }
+      } catch (err) {
+        console.error(`[Schema] Failed to analyze sale ${sale.id}:`, err);
+      }
+    }
+    
+    console.log(`[Schema] Updated ${updated} sales with shipping company from filename analysis`);
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(5);
+  }
+
   // Future migrations go here:
-  // if (version < 3) { ... }
+  // if (version < 6) { ... }
 }

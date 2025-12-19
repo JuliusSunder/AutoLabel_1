@@ -16,6 +16,7 @@ interface PrepareScreenProps {
 export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenProps) {
   const api = useAutolabel();
   const [sales, setSales] = useState<Sale[]>([]);
+  const [thumbnails, setThumbnails] = useState<Map<string, string>>(new Map());
   const [footerConfig, setFooterConfig] = useState<FooterConfig>({
     includeProductNumber: true,
     includeItemTitle: false,
@@ -50,6 +51,33 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
       setSales([]);
     }
   }, [selectedSaleIds]);
+
+  // Load thumbnails for selected sales
+  useEffect(() => {
+    const loadThumbnails = async () => {
+      const thumbMap = new Map<string, string>();
+
+      for (const sale of sales) {
+        try {
+          // @ts-ignore - New API not yet in types
+          const attachments = await api.attachments.getBySale(sale.id);
+          if (attachments && attachments.length > 0) {
+            // @ts-ignore - New API not yet in types
+            const thumbnail = await api.labels.getThumbnail(attachments[0].localPath);
+            thumbMap.set(sale.id, thumbnail);
+          }
+        } catch (err) {
+          console.error(`Failed to load thumbnail for sale ${sale.id}:`, err);
+        }
+      }
+
+      setThumbnails(thumbMap);
+    };
+
+    if (sales.length > 0) {
+      loadThumbnails();
+    }
+  }, [sales]);
 
   const handleToggleField = (field: keyof FooterConfig) => {
     setFooterConfig((prev) => ({
@@ -125,6 +153,17 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
           <div className="selected-sales-list">
             {sales.map((sale) => (
               <div key={sale.id} className="selected-sale-item">
+                {/* Thumbnail preview */}
+                {thumbnails.has(sale.id) && (
+                  <div className="sale-thumbnail">
+                    <img
+                      src={thumbnails.get(sale.id)}
+                      alt="Label preview"
+                      className="thumbnail-image"
+                    />
+                  </div>
+                )}
+                
                 <div className="selected-sale-info">
                   <strong>{sale.itemTitle || 'Untitled Sale'}</strong>
                   {sale.shippingCompany && <span className="sale-shipping-badge">{sale.shippingCompany}</span>}

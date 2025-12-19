@@ -30,11 +30,15 @@ export function SaleCard({ sale, selected, onToggleSelect, disabled }: SaleCardP
         <div className="sale-header">
           <h4 className="sale-title">
             {sale.itemTitle || 'Untitled Sale'}
-            {disabled && <span className="no-label-indicator"> (No Label)</span>}
           </h4>
-          {sale.platform && (
-            <span className="sale-platform">{sale.platform}</span>
-          )}
+          <div className="sale-badges">
+            {sale.shippingCompany && (
+              <span className="sale-shipping">{sale.shippingCompany}</span>
+            )}
+            {sale.platform && (
+              <span className="sale-platform">{sale.platform}</span>
+            )}
+          </div>
         </div>
 
         <div className="sale-details">
@@ -58,6 +62,18 @@ export function SaleCard({ sale, selected, onToggleSelect, disabled }: SaleCardP
               {sale.emailId.substring(0, 20)}...
             </span>
           </div>
+        </div>
+
+        <div className="sale-status">
+          {sale.hasAttachments ? (
+            <span className="sale-status-badge has-label">
+              ✓ Shipping Label Attached
+            </span>
+          ) : (
+            <span className="sale-status-badge no-label">
+              ✗ No Shipping Label
+            </span>
+          )}
         </div>
       </div>
     </div>

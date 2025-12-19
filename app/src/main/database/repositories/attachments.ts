@@ -16,6 +16,7 @@ function rowToAttachment(row: AttachmentRow): Attachment {
     type: row.type as 'pdf' | 'image',
     localPath: row.local_path,
     sourceEmailId: row.source_email_id,
+    originalFilename: row.original_filename || undefined,
   };
 }
 
@@ -30,8 +31,8 @@ export function createAttachment(
 
   const stmt = db.prepare(`
     INSERT INTO attachments (
-      id, sale_id, type, local_path, source_email_id
-    ) VALUES (?, ?, ?, ?, ?)
+      id, sale_id, type, local_path, source_email_id, original_filename
+    ) VALUES (?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -39,7 +40,8 @@ export function createAttachment(
     data.saleId,
     data.type,
     data.localPath,
-    data.sourceEmailId
+    data.sourceEmailId,
+    data.originalFilename || null
   );
 
   return {

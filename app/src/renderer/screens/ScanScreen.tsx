@@ -1,6 +1,6 @@
 /**
  * Scan Screen
- * Allows user to trigger email scanning
+ * Allows user to trigger Vinted email scanning
  */
 
 import React, { useState } from 'react';
@@ -10,78 +10,104 @@ import './ScanScreen.css';
 
 export function ScanScreen() {
   const api = useAutolabel();
-  const [isScanning, setIsScanning] = useState(false);
-  const [lastResult, setLastResult] = useState<ScanResult | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleScan = async () => {
-    setIsScanning(true);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
     setError(null);
+    setResult(null);
 
     try {
-      const result = await api.scan.start();
-      setLastResult(result);
-      console.log('Scan completed:', result);
+      const scanResult = await api.scan.refreshVinted();
+      setResult(scanResult);
+      console.log('Vinted refresh completed:', scanResult);
+      
+      // Reload page after 2 seconds to show new data
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
-      console.error('Scan failed:', err);
+      setError(err instanceof Error ? err.message : 'Refresh failed');
+      console.error('Vinted refresh failed:', err);
     } finally {
-      setIsScanning(false);
+      setIsRefreshing(false);
     }
   };
 
   return (
     <div className="screen scan-screen">
-      <h2 className="screen-title">Scan Emails</h2>
+      <h2 className="screen-title">Scan Vinted Emails</h2>
 
-      <div className="card scan-card">
-        <p className="scan-description">
-          Click the button below to scan your mailbox for new sales and shipping labels.
-          This will check emails from the last 30 days.
+      <div className="card scan-info">
+        <h3>🔄 Refresh Vinted Sales</h3>
+        <p>
+          This will scan your mailbox for <strong>Vinted shipping labels</strong> from the last 30 days.
         </p>
-
+        <p style={{ color: '#e67e22', fontWeight: 'bold', marginTop: '10px' }}>
+          ⚠️ Note: All existing data will be cleared and rescanned for a fresh start.
+        </p>
+        
         <button
           className="btn btn-primary scan-button"
-          onClick={handleScan}
-          disabled={isScanning}
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          style={{ marginTop: '15px' }}
         >
-          {isScanning ? 'Scanning...' : '📧 Scan Email'}
+          {isRefreshing ? '🔄 Refreshing...' : '🔄 Refresh Vinted Sales'}
         </button>
 
-        {lastResult && (
-          <div className="scan-result">
-            <h3>Last Scan Results</h3>
+        {result && (
+          <div className="scan-result" style={{ marginTop: '20px', border: '2px solid #27ae60' }}>
+            <h4>✅ Scan Complete!</h4>
             <p>
-              <strong>Emails scanned:</strong> {lastResult.scannedCount}
+              <strong>Vinted emails checked:</strong> {result.scannedCount}
             </p>
             <p>
-              <strong>New sales found:</strong> {lastResult.newSales}
+              <strong>Sales imported:</strong> {result.newSales}
             </p>
-            {lastResult.errors && lastResult.errors.length > 0 && (
+            {result.errors && result.errors.length > 0 && (
               <div className="scan-errors">
                 <strong>Errors:</strong>
                 <ul>
-                  {lastResult.errors.map((err, idx) => (
+                  {result.errors.map((err, idx) => (
                     <li key={idx}>{err}</li>
                   ))}
                 </ul>
               </div>
             )}
+            <p style={{ marginTop: '10px', fontStyle: 'italic', color: '#7f8c8d' }}>
+              Page will reload in 2 seconds to show updated data...
+            </p>
           </div>
         )}
 
         {error && (
-          <div className="scan-error">
+          <div className="scan-error" style={{ marginTop: '20px' }}>
             <strong>Error:</strong> {error}
           </div>
         )}
       </div>
 
       <div className="card scan-info">
-        <h3>💡 Configuration</h3>
+        <h3>📋 What Gets Scanned?</h3>
+        <ul style={{ marginLeft: '20px', lineHeight: '1.8' }}>
+          <li>✅ Only <strong>Vinted/Kleiderkreisel</strong> emails</li>
+          <li>✅ Only emails with <strong>PDF attachments</strong> (shipping labels)</li>
+          <li>✅ Automatically detects carrier: <strong>Hermes, DPD, DHL, GLS, UPS</strong></li>
+          <li>✅ Extracts item title from email subject</li>
+        </ul>
+      </div>
+
+      <div className="card scan-info">
+        <h3>💡 How It Works</h3>
         <p>
-          To configure your email settings (IMAP), use the config API.
-          Email scanning will be implemented in Phase 2.
+          The scanner reads the email body text where Vinted includes shipping instructions.
+          These instructions mention the carrier (e.g., "Bringe dein Paket zu einem Hermes PaketShop").
+        </p>
+        <p style={{ marginTop: '10px' }}>
+          After scanning, go to the <strong>History</strong> tab to see your sales and select which ones to prepare for printing.
         </p>
       </div>
     </div>

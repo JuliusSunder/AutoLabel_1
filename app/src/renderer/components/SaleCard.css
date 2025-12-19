@@ -72,6 +72,21 @@
   color: #2c3e50;
 }
 
+.sale-badges {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sale-shipping {
+  padding: 0.25rem 0.75rem;
+  background: #ff6b35;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .sale-platform {
   padding: 0.25rem 0.75rem;
   background: #3498db;
@@ -106,5 +121,31 @@
   font-family: monospace;
   font-size: 0.85rem;
   color: #7f8c8d;
+}
+
+.sale-status {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #ecf0f1;
+}
+
+.sale-status-badge {
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sale-status-badge.has-label {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.sale-status-badge.no-label {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 

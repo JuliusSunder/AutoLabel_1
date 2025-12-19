@@ -27,6 +27,7 @@ export interface Attachment {
   type: 'pdf' | 'image';
   localPath: string;
   sourceEmailId: string;
+  originalFilename?: string;
 }
 
 export interface PreparedLabel {
@@ -109,6 +110,7 @@ export interface AutoLabelAPI {
   scan: {
     start: () => Promise<ScanResult>;
     status: () => Promise<ScanStatus>;
+    refreshVinted: () => Promise<ScanResult>;
   };
   sales: {
     list: (params: { fromDate?: string; toDate?: string }) => Promise<Sale[]>;
@@ -119,6 +121,10 @@ export interface AutoLabelAPI {
       saleIds: string[];
       footerConfig: FooterConfig;
     }) => Promise<PreparedLabel[]>;
+    getThumbnail: (pdfPath: string) => Promise<string>;
+  };
+  attachments: {
+    getBySale: (saleId: string) => Promise<Attachment[]>;
   };
   print: {
     start: (params: {
@@ -157,6 +163,7 @@ export interface AttachmentRow {
   type: string;
   local_path: string;
   source_email_id: string;
+  original_filename: string | null;
 }
 
 export interface PreparedLabelRow {

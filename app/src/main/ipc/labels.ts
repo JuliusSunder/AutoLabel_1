@@ -5,6 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { prepareLabels } from '../labels/processor';
+import { generatePDFThumbnail } from '../labels/pdf-thumbnail';
 import type { PreparedLabel, FooterConfig } from '../../shared/types';
 
 /**
@@ -30,6 +31,24 @@ export function registerLabelsHandlers(): void {
       } catch (error) {
         console.error('[IPC] Label preparation failed:', error);
         throw error;
+      }
+    }
+  );
+
+  // Generate PDF thumbnail
+  ipcMain.handle(
+    'labels:getThumbnail',
+    async (_event, pdfPath: string): Promise<string> => {
+      console.log('[IPC] labels:getThumbnail called for:', pdfPath);
+
+      try {
+        const thumbnail = await generatePDFThumbnail(pdfPath, 200);
+        console.log('[IPC] Thumbnail generated successfully');
+        return thumbnail;
+      } catch (error) {
+        console.error('[IPC] Failed to generate thumbnail:', error);
+        // Return placeholder on error
+        return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5QREY8L3RleHQ+PC9zdmc+';
       }
     }
   );

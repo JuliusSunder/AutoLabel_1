@@ -7,6 +7,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { EmailMessage } from './imap-client';
+import { isLikelyShippingLabel } from './email-parser';
 
 /**
  * Get attachments directory path
@@ -94,14 +95,30 @@ export function saveAttachments(
     // Only save label attachments (PDF or image)
     if (!attachmentType) {
       console.log(
-        `[Attachments] Skipping non-label attachment: ${attachment.filename}`
+        `[Attachments] Skipping non-PDF/image attachment: ${attachment.filename}`
+      );
+      continue;
+    }
+
+    // Check if this looks like a shipping label (not an invoice/receipt)
+    if (!isLikelyShippingLabel(attachment.filename)) {
+      console.log(
+        `[Attachments] Skipping non-label attachment (invoice/receipt?): ${attachment.filename}`
       );
       continue;
     }
 
     try {
       // Generate filename: label_0.pdf, label_1.png, etc.
-      const ext = attachmentType === 'pdf' ? 'pdf' : path.extname(attachment.filename) || '.png';
+      let ext = '';
+      if (attachmentType === 'pdf') {
+        ext = '.pdf';
+      } else {
+        ext = path.extname(attachment.filename);
+        if (!ext) {
+          ext = '.png'; // Default to .png for images without extension
+        }
+      }
       const filename = `label_${labelIndex}${ext}`;
       const filePath = path.join(saleDir, filename);
 
