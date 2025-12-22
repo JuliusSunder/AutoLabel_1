@@ -244,6 +244,21 @@
   margin-bottom: 0.75rem;
 }
 
+.preview-thumbnail {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
+  background: white;
+}
+
+.preview-thumbnail-image {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .preview-sale-info {
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;

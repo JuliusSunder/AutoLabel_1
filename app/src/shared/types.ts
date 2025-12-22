@@ -62,7 +62,6 @@ export interface FooterConfig {
   includeProductNumber: boolean;
   includeItemTitle: boolean;
   includeDate: boolean;
-  includeBuyerRef: boolean;
 }
 
 export interface IMAPConfig {

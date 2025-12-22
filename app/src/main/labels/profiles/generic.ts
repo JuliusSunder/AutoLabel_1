@@ -42,33 +42,39 @@ async function processPdf(inputPath: string): Promise<string> {
   const pdfBytes = fs.readFileSync(inputPath);
   const pdfDoc = await PDFDocument.load(pdfBytes);
 
-  // Get first page
+  // Get first page only (ignore multi-page PDFs like Hermes "Zusammenfassung")
   const firstPage = pdfDoc.getPage(0);
   const { width: pageWidth, height: pageHeight } = firstPage.getSize();
 
-  console.log(`[Generic Profile] Original PDF size: ${pageWidth}x${pageHeight} points`);
+  console.log(`[Generic Profile] Original PDF size: ${pageWidth}x${pageHeight} points (first page only)`);
 
-  // Convert PDF page to image using sharp
-  // For MVP, we'll just scale the PDF page dimensions
-  // In production, you'd use pdf-poppler or similar to rasterize
   const targetDimensions = getTargetPixelDimensions();
+  const { getContentHeightPixels } = await import('../utils');
+  const contentHeight = getContentHeightPixels();
 
-  // Calculate scale to fit
+  // Create new PDF at target size (fit to content area, leaving space for footer)
+  const newPdf = await PDFDocument.create();
+  
+  // Calculate target size in PDF points (72 DPI)
+  const targetWidthPoints = (targetDimensions.width * 72) / 300; // Convert from 300 DPI pixels to points
+  const targetHeightPoints = (contentHeight * 72) / 300;
+  
+  const isLandscape = pageWidth > pageHeight;
+  console.log(`[Generic Profile] PDF orientation: ${isLandscape ? 'landscape' : 'portrait'}`);
+  
+  const newPage = newPdf.addPage([targetWidthPoints, targetHeightPoints]);
+
+  // Embed only the first page
+  const [embeddedPage] = await newPdf.embedPdf(pdfDoc, [0]);
+
+  // Calculate scale to fit (handle both orientations)
   const scale = calculateFitScale(
     pageWidth,
     pageHeight,
-    targetDimensions.width,
-    targetDimensions.height
+    targetWidthPoints,
+    targetHeightPoints
   );
 
-  // Create new PDF at target size
-  const newPdf = await PDFDocument.create();
-  const newPage = newPdf.addPage([targetDimensions.width, targetDimensions.height]);
-
-  // Embed the original page
-  const [embeddedPage] = await newPdf.embedPdf(pdfDoc, [0]);
-
-  // Calculate scaled dimensions
   const scaledWidth = pageWidth * scale;
   const scaledHeight = pageHeight * scale;
 
@@ -76,8 +82,8 @@ async function processPdf(inputPath: string): Promise<string> {
   const { x, y } = calculateCenteredPosition(
     scaledWidth,
     scaledHeight,
-    targetDimensions.width,
-    targetDimensions.height
+    targetWidthPoints,
+    targetHeightPoints
   );
 
   // Draw the embedded page scaled and centered
@@ -88,7 +94,7 @@ async function processPdf(inputPath: string): Promise<string> {
     height: scaledHeight,
   });
 
-  // Save to temp file
+  // Save to temp file as PDF first
   const outputPath = path.join(
     getTempDir(),
     `processed_${Date.now()}.pdf`
@@ -102,30 +108,51 @@ async function processPdf(inputPath: string): Promise<string> {
 }
 
 /**
- * Process an image label
+ * Process an image label with intelligent cropping
  */
 async function processImage(inputPath: string): Promise<string> {
   console.log('[Generic Profile] Processing image:', inputPath);
 
   const targetDimensions = getTargetPixelDimensions();
+  const { getContentHeightPixels } = await import('../utils');
+  const contentHeight = getContentHeightPixels(); // Reserve space for footer
 
-  // Load image metadata
-  const metadata = await sharp(inputPath).metadata();
-  const sourceWidth = metadata.width || 0;
-  const sourceHeight = metadata.height || 0;
+  // Load image
+  let image = sharp(inputPath);
+  let metadata = await image.metadata();
 
   console.log(
-    `[Generic Profile] Original image size: ${sourceWidth}x${sourceHeight}`
+    `[Generic Profile] Original image size: ${metadata.width}x${metadata.height}`
   );
 
-  // Resize image to fit target dimensions while maintaining aspect ratio
+  // Step 1: Trim whitespace (remove white borders)
+  console.log('[Generic Profile] Step 1: Trimming whitespace...');
+  image = sharp(inputPath).trim({
+    threshold: 240, // Consider pixels with RGB > 240 as white
+  });
+  metadata = await image.metadata();
+  console.log(`[Generic Profile] After trim: ${metadata.width}x${metadata.height}`);
+
+  // Step 2: Check orientation and rotate if landscape
+  const isLandscape = (metadata.width || 0) > (metadata.height || 0);
+  if (isLandscape) {
+    console.log('[Generic Profile] Step 2: Rotating landscape to portrait (90° CCW)...');
+    image = image.rotate(-90); // Rotate counter-clockwise
+    metadata = await image.metadata();
+    console.log(`[Generic Profile] After rotation: ${metadata.width}x${metadata.height}`);
+  } else {
+    console.log('[Generic Profile] Step 2: Already portrait orientation, no rotation needed');
+  }
+
+  // Step 3: Resize to fit content area (leaving space for footer)
+  console.log('[Generic Profile] Step 3: Resizing to target dimensions...');
   const outputPath = path.join(
     getTempDir(),
     `processed_${Date.now()}.png`
   );
 
-  await sharp(inputPath)
-    .resize(targetDimensions.width, targetDimensions.height, {
+  await image
+    .resize(targetDimensions.width, contentHeight, {
       fit: 'contain',
       background: { r: 255, g: 255, b: 255, alpha: 1 },
     })

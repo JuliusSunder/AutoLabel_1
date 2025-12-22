@@ -76,9 +76,9 @@ export async function prepareLabels(
         const normalized = await normalizeLabel(selectedAttachment.localPath);
 
         // Step 2: Add footer
-        const finalFilename = `label_${Date.now()}_${saleId}.${
-          selectedAttachment.type === 'pdf' ? 'pdf' : 'png'
-        }`;
+        // Keep format as-is for best quality
+        const normalizedExt = path.extname(normalized.outputPath).toLowerCase();
+        const finalFilename = `label_${Date.now()}_${saleId}${normalizedExt}`;
         const finalPath = path.join(getPreparedDir(), finalFilename);
 
         await addFooter(

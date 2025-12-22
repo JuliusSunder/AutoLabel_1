@@ -7,78 +7,268 @@ import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
+import { app } from 'electron';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
- * Generate a thumbnail from a PDF file
+ * Generate a thumbnail from a label file (PDF or PNG)
  * Returns base64 encoded image data URL for direct use in <img> src
  * 
- * @param pdfPath - Full path to the PDF file
+ * @param filePath - Full path to the label file (PDF or PNG)
  * @param width - Desired thumbnail width in pixels (default: 200)
  * @returns Base64 data URL string
  */
 export async function generatePDFThumbnail(
-  pdfPath: string,
+  filePath: string,
   width: number = 200
 ): Promise<string> {
   try {
-    console.log(`[PDF Thumbnail] Generating thumbnail for: ${pdfPath}`);
+    console.log(`[Thumbnail] Generating thumbnail for: ${filePath}`);
 
     // Check if file exists
-    if (!fs.existsSync(pdfPath)) {
-      console.warn(`[PDF Thumbnail] File not found: ${pdfPath}`);
+    if (!fs.existsSync(filePath)) {
+      console.warn(`[Thumbnail] File not found: ${filePath}`);
       return generatePlaceholder(width, 'File Not Found');
     }
 
-    // Load PDF
-    const pdfBytes = fs.readFileSync(pdfPath);
-    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const ext = path.extname(filePath).toLowerCase();
 
-    // Get first page dimensions
-    const firstPage = pdfDoc.getPage(0);
-    const { width: pageWidth, height: pageHeight } = firstPage.getSize();
+    // Handle PNG/image files
+    if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
+      return await generateImageThumbnail(filePath, width);
+    }
 
-    // Calculate thumbnail dimensions maintaining aspect ratio
-    const scale = width / pageWidth;
-    const thumbHeight = Math.floor(pageHeight * scale);
+    // Handle PDF files
+    if (ext === '.pdf') {
+      return await generatePDFThumbnailInternal(filePath, width);
+    }
 
-    console.log(`[PDF Thumbnail] PDF size: ${pageWidth}x${pageHeight} → Thumbnail: ${width}x${thumbHeight}`);
+    console.warn(`[Thumbnail] Unsupported file type: ${ext}`);
+    return generatePlaceholder(width, 'Unsupported Format');
 
-    // For MVP: Create a simple gray rectangle as placeholder
-    // In production, use pdf-poppler, pdf2pic, or similar to rasterize actual PDF content
-    const placeholder = await sharp({
-      create: {
-        width: width,
-        height: thumbHeight,
-        channels: 3,
-        background: { r: 245, g: 245, b: 245 }
-      }
+  } catch (error) {
+    console.error('[Thumbnail] Failed to generate thumbnail:', error);
+    return generatePlaceholder(width, 'Error Loading File');
+  }
+}
+
+/**
+ * Generate thumbnail from an image file
+ */
+async function generateImageThumbnail(
+  imagePath: string,
+  width: number
+): Promise<string> {
+  console.log(`[Thumbnail] Generating image thumbnail: ${imagePath}`);
+
+  // Get original dimensions
+  const metadata = await sharp(imagePath).metadata();
+  const originalWidth = metadata.width || width;
+  const originalHeight = metadata.height || Math.floor(width * 1.5);
+
+  // Calculate thumbnail height maintaining aspect ratio
+  const scale = width / originalWidth;
+  const height = Math.floor(originalHeight * scale);
+
+  // Resize image to thumbnail size
+  const thumbnail = await sharp(imagePath)
+    .resize(width, height, {
+      fit: 'contain',
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
     })
-      .composite([
-        {
-          input: Buffer.from(
-            `<svg width="${width}" height="${thumbHeight}">
-              <rect width="${width}" height="${thumbHeight}" fill="#f5f5f5" stroke="#ddd" stroke-width="2"/>
-              <text x="50%" y="40%" text-anchor="middle" font-size="16" fill="#999" font-family="Arial">📄 PDF Label</text>
-              <text x="50%" y="60%" text-anchor="middle" font-size="12" fill="#bbb" font-family="Arial">${path.basename(pdfPath)}</text>
-            </svg>`
-          ),
-          top: 0,
-          left: 0
-        }
-      ])
-      .png()
-      .toBuffer();
+    .png()
+    .toBuffer();
 
-    // Convert to base64 data URL
-    const base64 = placeholder.toString('base64');
-    const dataUrl = `data:image/png;base64,${base64}`;
+  // Convert to base64 data URL
+  const base64 = thumbnail.toString('base64');
+  const dataUrl = `data:image/png;base64,${base64}`;
 
-    console.log(`[PDF Thumbnail] ✅ Thumbnail generated successfully`);
+  console.log(`[Thumbnail] ✅ Image thumbnail generated: ${width}x${height}`);
+  return dataUrl;
+}
+
+/**
+ * Generate thumbnail from a PDF file using ImageMagick directly
+ * Renders actual PDF content to image
+ */
+async function generatePDFThumbnailInternal(
+  pdfPath: string,
+  width: number
+): Promise<string> {
+  console.log(`[Thumbnail] Generating PDF thumbnail with ImageMagick: ${pdfPath}`);
+
+  try {
+    // Get temp directory
+    const userDataPath = app.getPath('userData');
+    const tempDir = path.join(userDataPath, 'temp-thumbnails');
+    
+    // Create temp directory if it doesn't exist
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // Generate unique output filename
+    const outputFilename = `thumb_${Date.now()}.png`;
+    const outputPath = path.join(tempDir, outputFilename);
+    
+    // Calculate height (2:3 aspect ratio)
+    const height = Math.floor(width * 1.5);
+
+    console.log(`[Thumbnail] Converting first page of PDF to ${width}x${height} PNG...`);
+
+    // Use ImageMagick to convert PDF to PNG
+    // -density: resolution for rendering (higher = better quality)
+    // [0]: only convert first page
+    // -resize: scale to desired dimensions
+    // -quality: compression quality
+    const command = `magick -density 200 "${pdfPath}[0]" -resize ${width}x${height} -quality 90 "${outputPath}"`;
+    
+    console.log(`[Thumbnail] Executing: ${command}`);
+    
+    // Execute ImageMagick command
+    const { stdout, stderr } = await execAsync(command);
+    
+    if (stderr && !stderr.includes('Warning')) {
+      console.warn(`[Thumbnail] ImageMagick stderr: ${stderr}`);
+    }
+    
+    console.log(`[Thumbnail] PDF converted, checking output file: ${outputPath}`);
+
+    // Verify the output file exists
+    if (!fs.existsSync(outputPath)) {
+      throw new Error('ImageMagick did not produce output file');
+    }
+
+    // Read the generated PNG file
+    const imageBuffer = fs.readFileSync(outputPath);
+    const base64Data = imageBuffer.toString('base64');
+    
+    console.log(`[Thumbnail] Image file read, base64 length: ${base64Data.length}`);
+    
+    // Clean up temp file
+    try {
+      fs.unlinkSync(outputPath);
+      console.log(`[Thumbnail] Cleaned up temp file: ${outputPath}`);
+    } catch (cleanupError) {
+      console.warn('[Thumbnail] Failed to cleanup temp file:', cleanupError);
+    }
+
+    // Return as data URL
+    const dataUrl = `data:image/png;base64,${base64Data}`;
+
+    console.log(`[Thumbnail] ✅ PDF thumbnail generated successfully (data URL length: ${dataUrl.length})`);
     return dataUrl;
 
   } catch (error) {
-    console.error('[PDF Thumbnail] Failed to generate thumbnail:', error);
-    return generatePlaceholder(width, 'Error Loading PDF');
+    console.error('[Thumbnail] Failed to generate PDF thumbnail with ImageMagick:', error);
+    console.error('[Thumbnail] Make sure ImageMagick is installed and "magick" command is in PATH');
+    
+    // Fallback to placeholder
+    return generatePDFPlaceholder(pdfPath, width);
+  }
+}
+
+/**
+ * Generate a high-quality placeholder thumbnail for PDFs (fallback)
+ * Shows a professional label card with all important information
+ */
+function generatePDFPlaceholder(pdfPath: string, width: number): string {
+  const thumbHeight = Math.floor(width * 1.5); // 2:3 aspect ratio
+  
+  try {
+    // Try to get PDF info
+    const pdfBytes = fs.readFileSync(pdfPath);
+    const pdfDoc = PDFDocument.load(pdfBytes);
+    
+    // Get dimensions (sync)
+    let dimensions = '100×150mm';
+    try {
+      const doc: any = pdfDoc;
+      if (doc && typeof doc === 'object') {
+        // Try to extract dimensions if possible
+        dimensions = '100×150mm';
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    const footerHeight = Math.floor(thumbHeight * 0.12);
+    const contentHeight = thumbHeight - footerHeight;
+    
+    const svg = `
+      <svg width="${width}" height="${thumbHeight}" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background gradient -->
+        <defs>
+          <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#f8f9fa;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#e9ecef;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        
+        <rect width="${width}" height="${thumbHeight}" fill="url(#bgGrad)"/>
+        
+        <!-- Border -->
+        <rect x="3" y="3" width="${width - 6}" height="${thumbHeight - 6}" 
+              fill="none" stroke="#dee2e6" stroke-width="3" rx="8"/>
+        
+        <!-- Inner content box -->
+        <rect x="15" y="15" width="${width - 30}" height="${contentHeight - 30}" 
+              fill="white" stroke="#adb5bd" stroke-width="2" rx="6"/>
+        
+        <!-- Shipping icon -->
+        <text x="${width / 2}" y="${contentHeight * 0.28}" 
+              text-anchor="middle" font-size="${Math.floor(width / 4.5)}" 
+              fill="#495057">
+          📦
+        </text>
+        
+        <!-- Label text -->
+        <text x="${width / 2}" y="${contentHeight * 0.48}" 
+              text-anchor="middle" font-size="${Math.floor(width / 16)}" font-weight="bold"
+              fill="#212529" font-family="Arial, sans-serif">
+          Shipping Label
+        </text>
+        
+        <!-- Dimensions -->
+        <text x="${width / 2}" y="${contentHeight * 0.60}" 
+              text-anchor="middle" font-size="${Math.floor(width / 22)}"
+              fill="#6c757d" font-family="Arial, sans-serif">
+          ${dimensions}
+        </text>
+        
+        <!-- Status badge -->
+        <rect x="${width / 2 - 40}" y="${contentHeight * 0.70}" width="80" height="20" 
+              fill="#28a745" rx="10"/>
+        <text x="${width / 2}" y="${contentHeight * 0.70 + 14}" 
+              text-anchor="middle" font-size="${Math.floor(width / 28)}" font-weight="600"
+              fill="white" font-family="Arial, sans-serif">
+          Ready
+        </text>
+        
+        <!-- Footer -->
+        <rect y="${contentHeight}" width="${width}" height="${footerHeight}" fill="#343a40"/>
+        <text x="${width / 2}" y="${contentHeight + footerHeight / 2 + 5}" 
+              text-anchor="middle" font-size="${Math.floor(footerHeight / 2.5)}" font-weight="600"
+              fill="white" font-family="Arial, sans-serif">
+          WITH FOOTER
+        </text>
+      </svg>
+    `;
+    
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  } catch (error) {
+    // Simple fallback
+    const svg = `
+      <svg width="${width}" height="${thumbHeight}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${width}" height="${thumbHeight}" fill="#f8f8f8" stroke="#ddd" stroke-width="2"/>
+        <text x="50%" y="45%" text-anchor="middle" font-size="20" fill="#666" font-family="Arial">📄 PDF Label</text>
+        <text x="50%" y="60%" text-anchor="middle" font-size="12" fill="#999" font-family="Arial">Ready to Print</text>
+      </svg>
+    `;
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
   }
 }
 

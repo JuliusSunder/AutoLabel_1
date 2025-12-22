@@ -16,21 +16,17 @@ import { getFooterHeightPixels, getTargetPixelDimensions } from './utils';
 function generateFooterText(sale: Sale, config: FooterConfig): string {
   const parts: string[] = [];
 
-  if (config.includeProductNumber && sale.productNumber) {
-    parts.push(`#${sale.productNumber}`);
+  if (config.includeProductNumber) {
+    parts.push(sale.productNumber ? `#${sale.productNumber}` : 'No Product Number');
   }
 
-  if (config.includeItemTitle && sale.itemTitle) {
-    parts.push(sale.itemTitle.substring(0, 40)); // Truncate long titles
+  if (config.includeItemTitle) {
+    parts.push(sale.itemTitle ? sale.itemTitle.substring(0, 40) : 'No Item Title');
   }
 
   if (config.includeDate) {
     const date = new Date(sale.date);
     parts.push(date.toLocaleDateString('de-DE'));
-  }
-
-  if (config.includeBuyerRef && sale.buyerRef) {
-    parts.push(`Buyer: ${sale.buyerRef}`);
   }
 
   return parts.join(' | ');

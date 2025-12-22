@@ -21,12 +21,12 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
     includeProductNumber: true,
     includeItemTitle: false,
     includeDate: true,
-    includeBuyerRef: false,
   });
   const [isPreparing, setIsPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preparedLabels, setPreparedLabels] = useState<any[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [preparedThumbnails, setPreparedThumbnails] = useState<Map<string, string>>(new Map());
 
   // Load sale details when selectedSaleIds change
   useEffect(() => {
@@ -90,6 +90,7 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
     setIsPreparing(true);
     setError(null);
     setPreparedLabels([]);
+    setPreparedThumbnails(new Map());
 
     try {
       const result = await api.labels.prepare({
@@ -98,6 +99,19 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
       });
       setPreparedLabels(result);
       console.log('Labels prepared:', result);
+
+      // Load thumbnails for prepared labels
+      const thumbMap = new Map<string, string>();
+      for (const label of result) {
+        try {
+          // @ts-ignore - getThumbnail API exists
+          const thumbnail = await api.labels.getThumbnail(label.outputPath);
+          thumbMap.set(label.id, thumbnail);
+        } catch (err) {
+          console.error(`Failed to load thumbnail for label ${label.id}:`, err);
+        }
+      }
+      setPreparedThumbnails(thumbMap);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to prepare labels');
       console.error('Failed to prepare labels:', err);
@@ -218,15 +232,6 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
             />
             <span>Date</span>
           </label>
-
-          <label className="prepare-checkbox-label">
-            <input
-              type="checkbox"
-              checked={footerConfig.includeBuyerRef}
-              onChange={() => handleToggleField('includeBuyerRef')}
-            />
-            <span>Buyer Reference</span>
-          </label>
         </div>
       </div>
 
@@ -262,9 +267,22 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
               <div className="prepare-preview-grid">
                 {preparedLabels.map((label, index) => {
                   const sale = sales.find(s => s.id === label.saleId);
+                  const thumbnail = preparedThumbnails.get(label.id);
                   return (
                     <div key={label.id} className="prepare-preview-item">
                       <div className="preview-label-number">Label {index + 1}</div>
+                      
+                      {/* Thumbnail preview of prepared label */}
+                      {thumbnail && (
+                        <div className="preview-thumbnail">
+                          <img
+                            src={thumbnail}
+                            alt={`Prepared label ${index + 1}`}
+                            className="preview-thumbnail-image"
+                          />
+                        </div>
+                      )}
+                      
                       {sale && (
                         <div className="preview-sale-info">
                           <strong>{sale.itemTitle || 'Untitled Sale'}</strong>
@@ -288,7 +306,6 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
                             {footerConfig.includeProductNumber && <li>Product Number</li>}
                             {footerConfig.includeItemTitle && <li>Item Title</li>}
                             {footerConfig.includeDate && <li>Date</li>}
-                            {footerConfig.includeBuyerRef && <li>Buyer Reference</li>}
                           </ul>
                         </div>
                       )}

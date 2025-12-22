@@ -4,6 +4,7 @@
  */
 
 import { ipcMain } from 'electron';
+import fs from 'fs';
 import { prepareLabels } from '../labels/processor';
 import { generatePDFThumbnail } from '../labels/pdf-thumbnail';
 import type { PreparedLabel, FooterConfig } from '../../shared/types';
@@ -35,21 +36,31 @@ export function registerLabelsHandlers(): void {
     }
   );
 
-  // Generate PDF thumbnail
+  // Generate thumbnail
   ipcMain.handle(
     'labels:getThumbnail',
-    async (_event, pdfPath: string): Promise<string> => {
-      console.log('[IPC] labels:getThumbnail called for:', pdfPath);
+    async (_event, filePath: string): Promise<string> => {
+      console.log('[IPC] labels:getThumbnail called for:', filePath);
 
       try {
-        const thumbnail = await generatePDFThumbnail(pdfPath, 200);
+        const thumbnail = await generatePDFThumbnail(filePath, 300);
         console.log('[IPC] Thumbnail generated successfully');
         return thumbnail;
       } catch (error) {
         console.error('[IPC] Failed to generate thumbnail:', error);
-        // Return placeholder on error
-        return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMzAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5Ij5QREY8L3RleHQ+PC9zdmc+';
+        return generateErrorPlaceholder('Error loading file');
       }
     }
   );
+}
+
+/**
+ * Generate error placeholder
+ */
+function generateErrorPlaceholder(message: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300">
+    <rect width="200" height="300" fill="#f0f0f0"/>
+    <text x="50%" y="50%" text-anchor="middle" fill="#999" font-family="Arial" font-size="14">${message}</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 }
