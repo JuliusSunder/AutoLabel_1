@@ -10,8 +10,31 @@ import path from 'node:path';
 import { app } from 'electron';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { Canvas, createCanvas } from 'canvas';
 
 const execAsync = promisify(exec);
+
+// Configure PDF.js to work in Node.js environment
+const NodeCanvasFactory = {
+  create(width: number, height: number) {
+    const canvas = createCanvas(width, height);
+    return {
+      canvas,
+      context: canvas.getContext('2d'),
+    };
+  },
+  reset(canvasAndContext: any, width: number, height: number) {
+    canvasAndContext.canvas.width = width;
+    canvasAndContext.canvas.height = height;
+  },
+  destroy(canvasAndContext: any) {
+    canvasAndContext.canvas.width = 0;
+    canvasAndContext.canvas.height = 0;
+    canvasAndContext.canvas = null;
+    canvasAndContext.context = null;
+  },
+};
 
 /**
  * Generate a thumbnail from a label file (PDF or PNG)
@@ -166,7 +189,95 @@ async function generatePDFThumbnailInternal(
     console.error('[Thumbnail] Failed to generate PDF thumbnail with ImageMagick:', error);
     console.error('[Thumbnail] Make sure ImageMagick is installed and "magick" command is in PATH');
     
-    // Fallback to placeholder
+    // Fallback to PDF.js renderer
+    console.log('[Thumbnail] Trying PDF.js fallback renderer...');
+    return await generatePDFThumbnailWithPdfJs(pdfPath, width);
+  }
+}
+
+/**
+ * Generate thumbnail from a PDF file using PDF.js Canvas renderer
+ * Pure JavaScript fallback that works without external dependencies
+ */
+async function generatePDFThumbnailWithPdfJs(
+  pdfPath: string,
+  width: number
+): Promise<string> {
+  console.log(`[Thumbnail] Generating PDF thumbnail with PDF.js: ${pdfPath}`);
+
+  try {
+    // Calculate height (2:3 aspect ratio)
+    const height = Math.floor(width * 1.5);
+
+    // Read PDF file
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    const pdfData = new Uint8Array(pdfBuffer);
+
+    // Load PDF document
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfData,
+      useSystemFonts: true,
+      disableFontFace: false,
+    });
+
+    const pdfDocument = await loadingTask.promise;
+    console.log(`[Thumbnail] PDF.js loaded document with ${pdfDocument.numPages} pages`);
+
+    // Get first page
+    const page = await pdfDocument.getPage(1);
+    const viewport = page.getViewport({ scale: 1.0 });
+
+    // Calculate scale to fit desired dimensions
+    const scaleX = width / viewport.width;
+    const scaleY = height / viewport.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Create viewport with calculated scale
+    const scaledViewport = page.getViewport({ scale });
+
+    // Create canvas
+    const canvasFactory = NodeCanvasFactory.create(
+      Math.floor(scaledViewport.width),
+      Math.floor(scaledViewport.height)
+    );
+
+    // Render page to canvas
+    const renderContext = {
+      canvasContext: canvasFactory.context,
+      viewport: scaledViewport,
+    };
+
+    await page.render(renderContext).promise;
+    console.log(`[Thumbnail] PDF.js rendered page to canvas: ${Math.floor(scaledViewport.width)}x${Math.floor(scaledViewport.height)}`);
+
+    // Convert canvas to PNG buffer using Sharp for optimization
+    const canvasBuffer = canvasFactory.canvas.toBuffer('image/png');
+    
+    // Use Sharp to resize to exact dimensions and optimize
+    const optimizedBuffer = await sharp(canvasBuffer)
+      .resize(width, height, {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .png({ quality: 90, compressionLevel: 9 })
+      .toBuffer();
+
+    // Clean up
+    NodeCanvasFactory.destroy(canvasFactory);
+    await pdfDocument.destroy();
+
+    // Convert to base64 data URL
+    const base64Data = optimizedBuffer.toString('base64');
+    const dataUrl = `data:image/png;base64,${base64Data}`;
+
+    console.log(`[Thumbnail] ✅ PDF.js thumbnail generated successfully (data URL length: ${dataUrl.length})`);
+    return dataUrl;
+
+  } catch (error) {
+    console.error('[Thumbnail] Failed to generate PDF thumbnail with PDF.js:', error);
+    console.error('[Thumbnail] Falling back to placeholder');
+    
+    // Final fallback to placeholder
     return generatePDFPlaceholder(pdfPath, width);
   }
 }

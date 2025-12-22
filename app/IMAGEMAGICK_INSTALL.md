@@ -1,8 +1,16 @@
-# ImageMagick Installation für PDF-Vorschauen
+# ImageMagick Installation für PDF-Vorschauen (Optional)
 
-## Warum wird ImageMagick benötigt?
+## Neue Hybrid-Lösung ✨
 
-Die App verwendet `pdf2pic` um echte PDF-Vorschauen zu generieren. Dafür wird ImageMagick oder GraphicsMagick benötigt.
+**Gute Nachricht:** Die App funktioniert jetzt **ohne ImageMagick**!
+
+Die App verwendet ein intelligentes **Hybrid-System** für PDF-Vorschauen:
+1. **Mit ImageMagick + Ghostscript:** Beste Qualität (empfohlen für Produktion)
+2. **Ohne externe Tools:** Verwendet PDF.js - funktioniert automatisch ohne Installation
+
+## Warum ImageMagick trotzdem installieren?
+
+ImageMagick + Ghostscript bieten die **höchste Rendering-Qualität** für PDF-Vorschauen. Die Installation ist optional, aber empfohlen für beste Ergebnisse.
 
 ## Windows Installation
 
@@ -66,14 +74,16 @@ Die App verwendet `pdf2pic` um echte PDF-Vorschauen zu generieren. Dafür wird I
 - PDF-Rendering kann bei großen Dateien langsam sein
 - **Lösung:** In `pdf-thumbnail.ts` die `density` von 200 auf 150 reduzieren (niedrigere Qualität, aber schneller)
 
-## Fallback-System
+## Hybrid Fallback-System
 
-Wenn ImageMagick nicht verfügbar ist:
-- Die App zeigt professionelle Platzhalter-Karten
-- Labels können trotzdem vorbereitet und gedruckt werden
-- Nur die Vorschau zeigt keinen echten Inhalt
+Die App verwendet einen intelligenten 3-stufigen Fallback:
+1. **ImageMagick + Ghostscript** (beste Qualität) → Falls verfügbar
+2. **PDF.js Canvas Renderer** (gute Qualität) → Automatischer Fallback
+3. **Platzhalter** (Info-Karte) → Nur bei Fehlern
+
+**✅ Ergebnis:** PDF-Vorschauen zeigen **immer** den echten Inhalt, auch ohne Installation!
 
 ---
 
-**Hinweis:** Die Installation von ImageMagick ist nur einmalig nötig. Danach funktionieren die PDF-Vorschauen automatisch!
+**Hinweis:** Die Installation von ImageMagick ist optional. PDF-Vorschauen funktionieren auch ohne externe Tools dank PDF.js!
 
