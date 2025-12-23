@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+Bevor du Dateien liest, nutze immer zuerst codebase_search mit semantischen Fragen. 
+Lese Dateien nur wenn nötig und dann nur relevante Abschnitte (offset/limit). 
+Vermeide das Lesen von großen Dokumentationsdateien (README, ARCHITECTURE.md) wenn der Code ausreicht.

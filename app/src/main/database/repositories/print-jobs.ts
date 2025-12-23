@@ -204,3 +204,54 @@ export function getRecentPrintJobs(limit: number = 50): PrintJob[] {
     return job;
   });
 }
+
+/**
+ * Delete a print job and all its items
+ */
+export function deletePrintJob(id: string): void {
+  const db = getDatabase();
+
+  const deleteItems = db.prepare('DELETE FROM print_job_items WHERE job_id = ?');
+  const deleteJob = db.prepare('DELETE FROM print_jobs WHERE id = ?');
+
+  const transaction = db.transaction(() => {
+    deleteItems.run(id);
+    deleteJob.run(id);
+  });
+
+  transaction();
+  console.log(`[Print Jobs Repository] Deleted print job: ${id}`);
+}
+
+/**
+ * Get all items for a print job with detailed status
+ */
+export interface PrintJobItem {
+  id: string;
+  labelId: string;
+  status: 'pending' | 'printed' | 'failed';
+  error?: string;
+}
+
+export function getPrintJobItems(jobId: string): PrintJobItem[] {
+  const db = getDatabase();
+  const stmt = db.prepare(`
+    SELECT id, label_id, status, error 
+    FROM print_job_items 
+    WHERE job_id = ? 
+    ORDER BY id
+  `);
+  const rows = stmt.all(jobId) as Array<{
+    id: string;
+    label_id: string;
+    status: string;
+    error: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    labelId: row.label_id,
+    status: row.status as PrintJobItem['status'],
+    error: row.error || undefined,
+  }));
+}

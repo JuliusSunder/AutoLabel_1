@@ -54,6 +54,13 @@ export interface PrintJob {
   updatedAt: string;
 }
 
+export interface PrintJobItem {
+  id: string;
+  labelId: string;
+  status: 'pending' | 'printed' | 'failed';
+  error?: string;
+}
+
 // ============================================================================
 // Configuration Types
 // ============================================================================
@@ -131,6 +138,9 @@ export interface AutoLabelAPI {
       printerName?: string;
     }) => Promise<PrintJob>;
     status: (jobId: string) => Promise<PrintJob | null>;
+    listJobs: () => Promise<PrintJob[]>;
+    retry: (jobId: string) => Promise<void>;
+    delete: (jobId: string) => Promise<void>;
     listPrinters: () => Promise<PrinterInfo[]>;
   };
   config: {

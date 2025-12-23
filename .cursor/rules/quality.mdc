@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+Verwende TypeScript strikt. Halte IPC-Methoden klein und explizit. 
+Keine Secrets an Renderer zurückgeben. 
+Behalte Electron-Sicherheit: contextIsolation enabled, nodeIntegration disabled.

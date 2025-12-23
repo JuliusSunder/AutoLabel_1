@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
-import type { FooterConfig, Sale } from '../../shared/types';
+import type { FooterConfig, Sale, PrinterInfo } from '../../shared/types';
 import './PrepareScreen.css';
 
 interface PrepareScreenProps {
@@ -27,6 +27,8 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
   const [preparedLabels, setPreparedLabels] = useState<any[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [preparedThumbnails, setPreparedThumbnails] = useState<Map<string, string>>(new Map());
+  const [printers, setPrinters] = useState<PrinterInfo[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState<string | undefined>();
 
   // Load sale details when selectedSaleIds change
   useEffect(() => {
@@ -112,6 +114,18 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
         }
       }
       setPreparedThumbnails(thumbMap);
+
+      // Load printers after successful preparation
+      try {
+        const printerList = await api.print.listPrinters();
+        setPrinters(printerList);
+        // Auto-select default printer
+        const defaultPrinter = printerList.find((p) => p.isDefault);
+        setSelectedPrinter(defaultPrinter?.name || printerList[0]?.name);
+      } catch (err) {
+        console.error('Failed to load printers:', err);
+        // Don't block the user if printers can't be loaded
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to prepare labels');
       console.error('Failed to prepare labels:', err);
@@ -128,8 +142,8 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
 
     try {
       const labelIds = preparedLabels.map((l) => l.id);
-      await api.print.start({ labelIds });
-      console.log('Print job started');
+      await api.print.start({ labelIds, printerName: selectedPrinter });
+      console.log('Print job started with printer:', selectedPrinter);
       alert('Print job started! Check the Print Queue tab for status.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start printing');
@@ -250,10 +264,29 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
               <p>
                 ✅ Successfully prepared <strong>{preparedLabels.length}</strong> label(s)!
               </p>
+
+              {printers.length > 0 && (
+                <div className="prepare-printer-selection">
+                  <label htmlFor="printer-select">Drucker auswählen:</label>
+                  <select
+                    id="printer-select"
+                    value={selectedPrinter || ''}
+                    onChange={(e) => setSelectedPrinter(e.target.value)}
+                    className="prepare-printer-dropdown"
+                  >
+                    {printers.map((printer) => (
+                      <option key={printer.name} value={printer.name}>
+                        {printer.name} {printer.isDefault && '(Standard)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <button
                 className="btn btn-success"
                 onClick={handlePrint}
-                disabled={isPrinting}
+                disabled={isPrinting || !selectedPrinter}
               >
                 {isPrinting ? 'Starting Print...' : '🖨️ Print Now'}
               </button>

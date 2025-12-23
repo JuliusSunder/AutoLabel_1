@@ -9,7 +9,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
-import type { LabelProfile } from './base';
+import type { LabelProfile, ProfileContext } from './base';
 import {
   getTargetPixelDimensions,
   TARGET_SIZE_MM,
@@ -174,14 +174,17 @@ export const genericProfile: LabelProfile = {
   /**
    * Generic profile matches all files (fallback)
    */
-  async detect(filePath: string): Promise<boolean> {
+  async detect(filePath: string, context?: ProfileContext): Promise<boolean> {
     return true;
   },
 
   /**
    * Process label file (PDF or image)
    */
-  async process(filePath: string): Promise<{
+  async process(
+    filePath: string,
+    context?: ProfileContext
+  ): Promise<{
     outputPath: string;
     width: number;
     height: number;

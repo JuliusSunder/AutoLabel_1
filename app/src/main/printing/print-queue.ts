@@ -151,3 +151,29 @@ export async function retryPrintJob(jobId: string): Promise<void> {
   // Restart processing
   await processPrintJob(jobId);
 }
+
+/**
+ * Get all print jobs
+ */
+export function getAllPrintJobs(): PrintJob[] {
+  return printJobsRepo.getAllPrintJobs();
+}
+
+/**
+ * Delete a print job
+ */
+export function deletePrintJob(jobId: string): void {
+  console.log(`[Print Queue] Deleting print job: ${jobId}`);
+
+  const job = printJobsRepo.getPrintJobById(jobId);
+  if (!job) {
+    throw new Error('Print job not found');
+  }
+
+  // Only allow deletion of completed or failed jobs
+  if (job.status === 'printing' || job.status === 'pending') {
+    throw new Error('Cannot delete active print jobs');
+  }
+
+  printJobsRepo.deletePrintJob(jobId);
+}

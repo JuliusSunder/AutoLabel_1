@@ -4,7 +4,13 @@
  */
 
 import { ipcMain } from 'electron';
-import { startPrintJob, getPrintJobStatus } from '../printing/print-queue';
+import {
+  startPrintJob,
+  getPrintJobStatus,
+  getAllPrintJobs,
+  retryPrintJob,
+  deletePrintJob,
+} from '../printing/print-queue';
 import { listPrinters } from '../printing/printer-manager';
 import type { PrintJob, PrinterInfo } from '../../shared/types';
 
@@ -61,6 +67,46 @@ export function registerPrintHandlers(): void {
       return printers;
     } catch (error) {
       console.error('[IPC] Failed to list printers:', error);
+      throw error;
+    }
+  });
+
+  // List all print jobs
+  ipcMain.handle('print:listJobs', async (): Promise<PrintJob[]> => {
+    console.log('[IPC] print:listJobs called');
+
+    try {
+      const jobs = getAllPrintJobs();
+      console.log(`[IPC] Found ${jobs.length} print jobs`);
+      return jobs;
+    } catch (error) {
+      console.error('[IPC] Failed to list print jobs:', error);
+      throw error;
+    }
+  });
+
+  // Retry a print job
+  ipcMain.handle('print:retry', async (_event, jobId: string): Promise<void> => {
+    console.log('[IPC] print:retry called for job:', jobId);
+
+    try {
+      await retryPrintJob(jobId);
+      console.log(`[IPC] Successfully retried print job: ${jobId}`);
+    } catch (error) {
+      console.error('[IPC] Failed to retry print job:', error);
+      throw error;
+    }
+  });
+
+  // Delete a print job
+  ipcMain.handle('print:delete', async (_event, jobId: string): Promise<void> => {
+    console.log('[IPC] print:delete called for job:', jobId);
+
+    try {
+      deletePrintJob(jobId);
+      console.log(`[IPC] Successfully deleted print job: ${jobId}`);
+    } catch (error) {
+      console.error('[IPC] Failed to delete print job:', error);
       throw error;
     }
   });

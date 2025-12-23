@@ -3,22 +3,28 @@
  * Converts labels to standard 100×150mm format
  */
 
-import { detectProfile, getProfile } from './profiles/base';
+import { detectProfile, getProfile, ProfileContext } from './profiles/base';
 
 /**
  * Normalize a label to 100×150mm
  * Returns path to the normalized label file
  */
-export async function normalizeLabel(inputPath: string): Promise<{
+export async function normalizeLabel(
+  inputPath: string,
+  context?: ProfileContext
+): Promise<{
   outputPath: string;
   profileId: string;
   width: number;
   height: number;
 }> {
   console.log('[Normalizer] Normalizing label:', inputPath);
+  if (context?.shippingCompany) {
+    console.log('[Normalizer] Shipping company:', context.shippingCompany);
+  }
 
   // Detect which profile to use
-  const profileId = await detectProfile(inputPath);
+  const profileId = await detectProfile(inputPath, context);
   const profile = getProfile(profileId);
 
   if (!profile) {
@@ -26,7 +32,7 @@ export async function normalizeLabel(inputPath: string): Promise<{
   }
 
   // Process the label using the profile
-  const result = await profile.process(inputPath);
+  const result = await profile.process(inputPath, context);
 
   console.log(
     `[Normalizer] Normalized with ${profileId}: ${result.width}×${result.height}mm`

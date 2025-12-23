@@ -26,8 +26,20 @@ Tech stack
 -Electron Forge + Vite + TypeScript
 -Secure Electron model: renderer has no Node; OS actions are done in main via preload IPC
 
-Run locally
-Prereqs: recent Node.js + npm
+## Prerequisites
+
+### Required
+- Recent Node.js + npm
+- **SumatraPDF** (for reliable label printing)
+  - Download: https://www.sumatrapdfreader.org/download-free-pdf-viewer
+  - See [SUMATRA_PDF_INSTALL.md](SUMATRA_PDF_INSTALL.md) for installation instructions
+  - Without SumatraPDF, the app will use Electron fallback (may have rendering issues)
+
+### Optional
+- ImageMagick (for advanced label processing)
+  - See [IMAGEMAGICK_INSTALL.md](IMAGEMAGICK_INSTALL.md)
+
+## Run locally
 
 ```bash
 npm install

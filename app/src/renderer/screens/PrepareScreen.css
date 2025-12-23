@@ -177,6 +177,49 @@
   color: #155724;
 }
 
+.prepare-printer-selection {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #ffffff;
+  border: 1px solid #c3e6cb;
+  border-radius: 6px;
+}
+
+.prepare-printer-selection label {
+  display: block;
+  font-weight: 600;
+  color: #155724;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.prepare-printer-dropdown {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 2px solid #28a745;
+  border-radius: 6px;
+  background: white;
+  color: #2c3e50;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.prepare-printer-dropdown:hover {
+  border-color: #1e7e34;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+.prepare-printer-dropdown:focus {
+  outline: none;
+  border-color: #1e7e34;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+}
+
+.prepare-success .btn {
+  margin-top: 1rem;
+}
+
 .prepare-hint {
   font-size: 0.9rem;
   color: #6c757d !important;

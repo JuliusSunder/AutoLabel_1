@@ -27,6 +27,9 @@ const autolabelAPI: AutoLabelAPI = {
   print: {
     start: (params) => ipcRenderer.invoke('print:start', params),
     status: (jobId) => ipcRenderer.invoke('print:status', jobId),
+    listJobs: () => ipcRenderer.invoke('print:listJobs'),
+    retry: (jobId) => ipcRenderer.invoke('print:retry', jobId),
+    delete: (jobId) => ipcRenderer.invoke('print:delete', jobId),
     listPrinters: () => ipcRenderer.invoke('print:listPrinters'),
   },
   config: {

@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+AutoLabel ist eine Electron-App mit strikter Trennung:
+- main/ = Email-Scanning, Label-Verarbeitung, Drucken, Datenbank (Node.js)
+- renderer/ = UI nur (React, kein Node.js Zugriff)
+- preload/ = Minimaler IPC-Bridge
+
+Standard Label-Größe: 100×150mm (4×6"). 
+Kein Background-Scanning. Lokale SQLite-Datenbank.

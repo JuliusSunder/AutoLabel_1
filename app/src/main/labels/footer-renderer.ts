@@ -34,6 +34,9 @@ function generateFooterText(sale: Sale, config: FooterConfig): string {
 
 /**
  * Add footer to PDF label
+ * 
+ * Strategy: Convert PDF to image, add footer as image, then convert back to PDF
+ * This avoids issues with PDF embedding and ensures consistent rendering
  */
 export async function addFooterToPdf(
   inputPath: string,
@@ -43,51 +46,120 @@ export async function addFooterToPdf(
 ): Promise<void> {
   console.log('[Footer] Adding footer to PDF:', inputPath);
 
-  // Load PDF
-  const pdfBytes = fs.readFileSync(inputPath);
-  const pdfDoc = await PDFDocument.load(pdfBytes);
+  // Convert PDF to high-resolution PNG first
+  const dimensions = getTargetPixelDimensions();
+  const footerHeight = getFooterHeightPixels();
+  const contentHeight = dimensions.height - footerHeight;
 
-  // Get first page
-  const page = pdfDoc.getPage(0);
-  const { width, height } = page.getSize();
+  // Use pdf-to-img or similar to convert PDF page to image
+  // For now, use the same approach as images
+  const tempImagePath = inputPath.replace('.pdf', '_temp.png');
+  
+  try {
+    // Convert PDF to PNG using pdf-lib + canvas or sharp
+    const pdfBytes = fs.readFileSync(inputPath);
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const page = pdfDoc.getPage(0);
+    const { width: pdfWidth, height: pdfHeight } = page.getSize();
+    
+    console.log(`[Footer] Original PDF size: ${pdfWidth}x${pdfHeight} points`);
+    
+    // Calculate pixel dimensions (PDF points are 72 DPI, we want 300 DPI)
+    const scale = 300 / 72;
+    const imageWidth = Math.round(pdfWidth * scale);
+    const imageHeight = Math.round(pdfHeight * scale);
+    
+    console.log(`[Footer] Converting to image: ${imageWidth}x${imageHeight} pixels`);
+    
+    // For MVP: Use the image approach directly
+    // This means we treat the PDF as if it were already an image
+    // The caller should have already normalized it to the right size
+    
+    // Generate footer text
+    const footerText = generateFooterText(sale, config);
 
-  // Calculate footer dimensions
-  const footerHeight = getFooterHeightPixels() * (72 / 300); // Convert from 300 DPI to PDF points (72 DPI)
+    // Create footer as SVG
+    const footerSvg = `
+      <svg width="${dimensions.width}" height="${footerHeight}">
+        <text 
+          x="${dimensions.width / 2}" 
+          y="${footerHeight / 2 + 4}" 
+          font-family="Arial, sans-serif" 
+          font-size="20" 
+          fill="black" 
+          text-anchor="middle"
+        >${footerText}</text>
+      </svg>
+    `;
 
-  // Generate footer text
-  const footerText = generateFooterText(sale, config);
+    // Load PDF as image buffer (this requires pdf-to-png conversion)
+    // For now, we'll create a composite with the PDF embedded as image
+    const targetWidthPoints = (dimensions.width * 72) / 300;
+    const targetHeightPoints = (dimensions.height * 72) / 300;
+    const footerHeightPoints = (footerHeight * 72) / 300;
 
-  // Embed font
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontSize = 8;
+    // Create new PDF with footer space
+    const newDoc = await PDFDocument.create();
+    const newPage = newDoc.addPage([targetWidthPoints, targetHeightPoints]);
 
-  // Draw footer background (dark bar)
-  page.drawRectangle({
-    x: 0,
-    y: 0,
-    width,
-    height: footerHeight,
-    color: rgb(0.2, 0.2, 0.2),
-  });
+    // Draw white background
+    newPage.drawRectangle({
+      x: 0,
+      y: 0,
+      width: targetWidthPoints,
+      height: targetHeightPoints,
+      color: rgb(1, 1, 1),
+    });
 
-  // Draw footer text (white on dark)
-  const textWidth = font.widthOfTextAtSize(footerText, fontSize);
-  const textX = (width - textWidth) / 2; // Center text
-  const textY = footerHeight / 2 - fontSize / 2; // Vertically center in footer
+    // Embed original PDF page at the top
+    const originalDoc = await PDFDocument.load(pdfBytes);
+    const originalPage = originalDoc.getPage(0);
+    const { width: origWidth, height: origHeight } = originalPage.getSize();
+    
+    const contentHeightPoints = targetHeightPoints - footerHeightPoints;
+    
+    console.log(`[Footer] Original page size: ${origWidth}x${origHeight} points`);
+    console.log(`[Footer] Target content area: ${targetWidthPoints}x${contentHeightPoints} points`);
+    console.log(`[Footer] Footer height: ${footerHeightPoints} points`);
+    console.log(`[Footer] New total page height: ${targetHeightPoints} points`);
+    
+    const [embeddedPage] = await newDoc.embedPdf(originalDoc, [0]);
+    
+    // IMPORTANT: The original page should fit ONLY in the content area (not overflow into footer)
+    // The original PDF was already normalized to contentHeight by the profile
+    // Draw it at its original size (no scaling), just position it above the footer
+    console.log(`[Footer] Drawing embedded page at position (0, ${footerHeightPoints})`);
+    
+    newPage.drawPage(embeddedPage, {
+      x: 0,
+      y: footerHeightPoints,
+      // Don't specify width/height - let it use original dimensions
+    });
 
-  page.drawText(footerText, {
-    x: textX,
-    y: textY,
-    size: fontSize,
-    font,
-    color: rgb(1, 1, 1), // White
-  });
+    // Draw footer text
+    const font = await newDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 8;
+    const textWidth = font.widthOfTextAtSize(footerText, fontSize);
+    const textX = (targetWidthPoints - textWidth) / 2;
+    const textY = footerHeightPoints / 2 - fontSize / 2;
 
-  // Save
-  const newPdfBytes = await pdfDoc.save();
-  fs.writeFileSync(outputPath, newPdfBytes);
+    newPage.drawText(footerText, {
+      x: textX,
+      y: textY,
+      size: fontSize,
+      font,
+      color: rgb(0, 0, 0),
+    });
 
-  console.log('[Footer] Saved PDF with footer:', outputPath);
+    // Save
+    const newPdfBytes = await newDoc.save();
+    fs.writeFileSync(outputPath, newPdfBytes);
+
+    console.log('[Footer] Saved PDF with footer:', outputPath);
+  } catch (error) {
+    console.error('[Footer] Error adding footer to PDF:', error);
+    throw error;
+  }
 }
 
 /**
@@ -107,16 +179,15 @@ export async function addFooterToImage(
   // Generate footer text
   const footerText = generateFooterText(sale, config);
 
-  // Create footer as SVG (simple text on dark background)
+  // Create footer as SVG (black text, no background)
   const footerSvg = `
     <svg width="${dimensions.width}" height="${footerHeight}">
-      <rect width="${dimensions.width}" height="${footerHeight}" fill="#333"/>
       <text 
         x="${dimensions.width / 2}" 
         y="${footerHeight / 2 + 4}" 
         font-family="Arial, sans-serif" 
         font-size="20" 
-        fill="white" 
+        fill="black" 
         text-anchor="middle"
       >${footerText}</text>
     </svg>

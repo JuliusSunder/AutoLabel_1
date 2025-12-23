@@ -10,6 +10,7 @@ import { normalizeLabel } from './normalizer';
 import { addFooter } from './footer-renderer';
 import { registerProfile } from './profiles/base';
 import { genericProfile } from './profiles/generic';
+import { vintedProfile } from './profiles/vinted';
 import * as salesRepo from '../database/repositories/sales';
 import * as attachmentsRepo from '../database/repositories/attachments';
 import * as labelsRepo from '../database/repositories/labels';
@@ -17,6 +18,8 @@ import type { FooterConfig, PreparedLabel } from '../../shared/types';
 import { TARGET_SIZE_MM, TARGET_DPI } from './utils';
 
 // Register profiles on module load
+// Order matters: Vinted profile is checked first, generic is fallback
+registerProfile(vintedProfile);
 registerProfile(genericProfile);
 
 /**
@@ -73,7 +76,11 @@ export async function prepareLabels(
         console.log(`[Processor] Processing attachment: ${selectedAttachment.id}`);
 
         // Step 1: Normalize to 100×150mm
-        const normalized = await normalizeLabel(selectedAttachment.localPath);
+        const normalized = await normalizeLabel(selectedAttachment.localPath, {
+          shippingCompany: sale.shippingCompany,
+          platform: sale.platform,
+          saleId: sale.id,
+        });
 
         // Step 2: Add footer
         // Keep format as-is for best quality
