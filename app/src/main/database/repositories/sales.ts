@@ -21,6 +21,7 @@ function rowToSale(row: SaleRow): Sale {
     buyerRef: row.buyer_ref || undefined,
     metadata: row.metadata_json ? JSON.parse(row.metadata_json) : undefined,
     createdAt: row.created_at,
+    accountId: row.account_id || undefined,
   };
 }
 
@@ -35,8 +36,8 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
   const stmt = db.prepare(`
     INSERT INTO sales (
       id, email_id, date, platform, shipping_company, product_number, 
-      item_title, buyer_ref, metadata_json, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      item_title, buyer_ref, metadata_json, created_at, account_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -49,7 +50,8 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
     data.itemTitle || null,
     data.buyerRef || null,
     data.metadata ? JSON.stringify(data.metadata) : null,
-    createdAt
+    createdAt,
+    data.accountId || null
   );
 
   return {
@@ -80,11 +82,12 @@ export function getSaleByEmailId(emailId: string): Sale | null {
 }
 
 /**
- * List sales with optional date filtering
+ * List sales with optional date and account filtering
  */
 export function listSales(params: {
   fromDate?: string;
   toDate?: string;
+  accountId?: string;
 }): Sale[] {
   const db = getDatabase();
   let query = `
@@ -106,6 +109,11 @@ export function listSales(params: {
     queryParams.push(params.toDate);
   }
 
+  if (params.accountId) {
+    query += ' AND s.account_id = ?';
+    queryParams.push(params.accountId);
+  }
+
   query += ' ORDER BY s.date DESC, s.created_at DESC';
 
   const stmt = db.prepare(query);
@@ -118,6 +126,35 @@ export function listSales(params: {
       hasAttachments: row.attachment_count > 0,
     };
   });
+}
+
+/**
+ * Get all sales for a specific account
+ */
+export function getSalesByAccount(accountId: string): Sale[] {
+  return listSales({ accountId });
+}
+
+/**
+ * Get sales count per account
+ */
+export function getSalesCountByAccount(): Record<string, number> {
+  const db = getDatabase();
+  const stmt = db.prepare(`
+    SELECT 
+      COALESCE(account_id, 'null') as account_id, 
+      COUNT(*) as count 
+    FROM sales 
+    GROUP BY account_id
+  `);
+  const rows = stmt.all() as Array<{ account_id: string; count: number }>;
+  
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    counts[row.account_id] = row.count;
+  }
+  
+  return counts;
 }
 
 /**

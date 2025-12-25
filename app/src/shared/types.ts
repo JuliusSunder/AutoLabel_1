@@ -19,6 +19,19 @@ export interface Sale {
   metadata?: Record<string, any>; // Flexible storage for extra fields
   createdAt: string; // ISO timestamp
   hasAttachments?: boolean; // Whether sale has label attachments
+  accountId?: string; // Email account this sale came from
+}
+
+export interface EmailAccount {
+  id: string;
+  name: string; // User-defined name (e.g., "Gmail Main", "Outlook Business")
+  host: string; // IMAP host
+  port: number; // IMAP port
+  username: string; // Email address
+  password: string; // Decrypted password (only in main process)
+  tls: boolean;
+  isActive: boolean; // Whether account is active for scanning
+  createdAt: string;
 }
 
 export interface Attachment {
@@ -114,12 +127,12 @@ export interface PrinterInfo {
 
 export interface AutoLabelAPI {
   scan: {
-    start: () => Promise<ScanResult>;
+    start: (accountId?: string) => Promise<ScanResult>;
     status: () => Promise<ScanStatus>;
     refreshVinted: () => Promise<ScanResult>;
   };
   sales: {
-    list: (params: { fromDate?: string; toDate?: string }) => Promise<Sale[]>;
+    list: (params: { fromDate?: string; toDate?: string; accountId?: string }) => Promise<Sale[]>;
     get: (id: string) => Promise<Sale | null>;
   };
   labels: {
@@ -147,6 +160,15 @@ export interface AutoLabelAPI {
     get: () => Promise<AppConfig>;
     set: (config: Partial<AppConfig>) => Promise<void>;
   };
+  accounts: {
+    list: () => Promise<EmailAccount[]>;
+    create: (data: Omit<EmailAccount, 'id' | 'createdAt'>) => Promise<EmailAccount>;
+    update: (id: string, data: Partial<Omit<EmailAccount, 'id' | 'createdAt'>>) => Promise<void>;
+    delete: (id: string) => Promise<void>;
+    toggle: (id: string) => Promise<void>;
+    test: (config: { host: string; port: number; username: string; password: string; tls: boolean }) => Promise<{ success: boolean; error?: string }>;
+    testExisting: (accountId: string) => Promise<{ success: boolean; error?: string }>;
+  };
 }
 
 // ============================================================================
@@ -164,6 +186,7 @@ export interface SaleRow {
   buyer_ref: string | null;
   metadata_json: string | null;
   created_at: string;
+  account_id: string | null;
 }
 
 export interface AttachmentRow {
@@ -173,6 +196,18 @@ export interface AttachmentRow {
   local_path: string;
   source_email_id: string;
   original_filename: string | null;
+}
+
+export interface EmailAccountRow {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  encrypted_password: string;
+  tls: number; // SQLite stores booleans as 0/1
+  is_active: number; // SQLite stores booleans as 0/1
+  created_at: string;
 }
 
 export interface PreparedLabelRow {

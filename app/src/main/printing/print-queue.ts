@@ -3,10 +3,11 @@
  * Manages print jobs and retries
  */
 
-import { printPdf } from './printer-manager';
+import { printPdf, getDefaultPrinter, listPrinters } from './printer-manager';
 import * as printJobsRepo from '../database/repositories/print-jobs';
 import * as labelsRepo from '../database/repositories/labels';
 import type { PrintJob } from '../../shared/types';
+import fs from 'node:fs';
 
 /**
  * Start a print job
@@ -20,7 +21,7 @@ export async function startPrintJob(
   // Verify labels exist
   const labels = labelsRepo.getPreparedLabelsByIds(labelIds);
   if (labels.length === 0) {
-    throw new Error('No valid labels found');
+    throw new Error('Keine gültigen Labels gefunden');
   }
 
   if (labels.length !== labelIds.length) {
@@ -29,11 +30,36 @@ export async function startPrintJob(
     );
   }
 
+  // Validate all label files exist
+  const missingLabels: string[] = [];
+  for (const label of labels) {
+    if (!label.outputPath || !fs.existsSync(label.outputPath)) {
+      missingLabels.push(label.id);
+    }
+  }
+
+  if (missingLabels.length > 0) {
+    throw new Error(
+      `Label-Dateien nicht gefunden: ${missingLabels.length} von ${labels.length}`
+    );
+  }
+
   // Determine printer
   let targetPrinter = printerName;
   if (!targetPrinter) {
-    // TODO: Get default printer
-    targetPrinter = 'default';
+    targetPrinter = await getDefaultPrinter();
+    if (!targetPrinter) {
+      throw new Error('Kein Drucker ausgewählt');
+    }
+  }
+
+  // Validate printer exists
+  const availablePrinters = await listPrinters();
+  const printerExists = availablePrinters.some(
+    (p) => p.name === targetPrinter
+  );
+  if (!printerExists) {
+    throw new Error(`Drucker "${targetPrinter}" nicht verfügbar`);
   }
 
   // Create print job
@@ -75,7 +101,7 @@ async function processPrintJob(jobId: string): Promise<void> {
 
   for (const label of labels) {
     try {
-      console.log(`[Print Queue] Printing label: ${label.id}`);
+      console.debug(`[Print Queue] Printing label: ${label.id}`);
 
       // Print the label
       await printPdf(label.outputPath, job.printerName);
@@ -87,7 +113,7 @@ async function processPrintJob(jobId: string): Promise<void> {
       printedCount++;
       printJobsRepo.incrementPrintedCount(jobId);
 
-      console.log(
+      console.debug(
         `[Print Queue] Successfully printed ${printedCount}/${labels.length}`
       );
     } catch (error) {
@@ -142,7 +168,16 @@ export async function retryPrintJob(jobId: string): Promise<void> {
 
   const job = printJobsRepo.getPrintJobById(jobId);
   if (!job) {
-    throw new Error('Print job not found');
+    throw new Error('Druck-Job nicht gefunden');
+  }
+
+  // Validate printer still exists
+  const availablePrinters = await listPrinters();
+  const printerExists = availablePrinters.some(
+    (p) => p.name === job.printerName
+  );
+  if (!printerExists) {
+    throw new Error(`Drucker "${job.printerName}" nicht verfügbar`);
   }
 
   // Reset job status
@@ -167,12 +202,12 @@ export function deletePrintJob(jobId: string): void {
 
   const job = printJobsRepo.getPrintJobById(jobId);
   if (!job) {
-    throw new Error('Print job not found');
+    throw new Error('Druck-Job nicht gefunden');
   }
 
   // Only allow deletion of completed or failed jobs
   if (job.status === 'printing' || job.status === 'pending') {
-    throw new Error('Cannot delete active print jobs');
+    throw new Error('Aktive Druck-Jobs können nicht gelöscht werden');
   }
 
   printJobsRepo.deletePrintJob(jobId);

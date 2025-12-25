@@ -10,6 +10,18 @@ import { execSync } from 'node:child_process';
 import type { PrinterInfo } from '../../shared/types';
 
 /**
+ * Extended Electron PrinterInfo with runtime properties
+ */
+interface ElectronPrinterInfo {
+  name: string;
+  displayName?: string;
+  description?: string;
+  isDefault?: boolean;
+  status?: number | string;
+  options?: Record<string, unknown>;
+}
+
+/**
  * Get list of available printers
  */
 export async function listPrinters(): Promise<PrinterInfo[]> {
@@ -25,11 +37,14 @@ export async function listPrinters(): Promise<PrinterInfo[]> {
     const mainWindow = windows[0];
     const printers = await mainWindow.webContents.getPrintersAsync();
 
-    return printers.map((printer) => ({
-      name: printer.name,
-      isDefault: printer.isDefault || false,
-      status: printer.status?.toString() || 'unknown',
-    }));
+    return printers.map((printer): PrinterInfo => {
+      const extendedPrinter = printer as unknown as ElectronPrinterInfo;
+      return {
+        name: extendedPrinter.name,
+        isDefault: extendedPrinter.isDefault || false,
+        status: extendedPrinter.status?.toString() || 'unknown',
+      };
+    });
   } catch (error) {
     console.error('[Printer] Failed to list printers:', error);
     return [];
@@ -61,7 +76,7 @@ function findSumatraPDF(): string | null {
 
   for (const sumatraPath of possiblePaths) {
     if (fs.existsSync(sumatraPath)) {
-      console.log(`[Printer] Found SumatraPDF at: ${sumatraPath}`);
+      console.debug(`[Printer] Found SumatraPDF at: ${sumatraPath}`);
       return sumatraPath;
     }
   }
@@ -69,7 +84,7 @@ function findSumatraPDF(): string | null {
   // Try to find in PATH
   try {
     execSync('where SumatraPDF.exe', { encoding: 'utf-8' });
-    console.log('[Printer] Found SumatraPDF in system PATH');
+    console.debug('[Printer] Found SumatraPDF in system PATH');
     return 'SumatraPDF.exe';
   } catch {
     // Not in PATH
@@ -88,7 +103,7 @@ async function printPdfWithSumatra(
 ): Promise<void> {
   const sumatraPath = findSumatraPDF();
   if (!sumatraPath) {
-    throw new Error('SumatraPDF not found');
+    throw new Error('Drucker-Software nicht installiert');
   }
 
   // Escape paths for command line
@@ -99,7 +114,7 @@ async function printPdfWithSumatra(
   // Build command: SumatraPDF.exe -print-to "Printer Name" "file.pdf"
   const command = `${escapedSumatraPath} -print-to ${escapedPrinterName} ${escapedPdfPath}`;
 
-  console.log(`[Printer] Executing SumatraPDF command: ${command}`);
+  console.debug(`[Printer] Executing SumatraPDF command: ${command}`);
 
   try {
     // Execute synchronously and wait for completion
@@ -112,9 +127,13 @@ async function printPdfWithSumatra(
     console.log(`[Printer] SumatraPDF print completed successfully`);
   } catch (error) {
     console.error('[Printer] SumatraPDF print failed:', error);
-    throw new Error(
-      `SumatraPDF print failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
+    
+    // Parse error for user-friendly message
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+      throw new Error('Druck dauert zu lange - bitte Drucker prüfen');
+    }
+    throw new Error('Druck fehlgeschlagen - bitte Drucker prüfen');
   }
 }
 
@@ -126,41 +145,41 @@ async function printPdfWithElectron(
   pdfPath: string,
   printerName: string
 ): Promise<void> {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const windows = BrowserWindow.getAllWindows();
-      if (windows.length === 0) {
-        throw new Error('No windows available for printing');
-      }
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length === 0) {
+    throw new Error('Kein Fenster für Druck verfügbar');
+  }
 
-      console.log('[Printer] Using Electron fallback method (may have rendering issues)');
+  console.log('[Printer] Using Electron fallback method (may have rendering issues)');
 
-      // Create a hidden window for printing with WHITE background
-      const printWindow = new BrowserWindow({
-        show: false,
-        backgroundColor: '#FFFFFF',
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          backgroundThrottling: false,
-        },
-      });
+  // Create a hidden window for printing with WHITE background
+  const printWindow = new BrowserWindow({
+    show: false,
+    backgroundColor: '#FFFFFF',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+    },
+  });
 
-      // Load PDF
-      await printWindow.loadFile(pdfPath);
+  try {
+    // Load PDF
+    await printWindow.loadFile(pdfPath);
 
-      // Print options
-      const printOptions: Electron.WebContentsPrintOptions = {
-        silent: true,
-        printBackground: false,
-        color: false,
-        deviceName: printerName,
-        margins: {
-          marginType: 'none',
-        },
-      };
+    // Print options
+    const printOptions: Electron.WebContentsPrintOptions = {
+      silent: true,
+      printBackground: false,
+      color: false,
+      deviceName: printerName,
+      margins: {
+        marginType: 'none',
+      },
+    };
 
-      // Print
+    // Print and wait for completion
+    return new Promise<void>((resolve, reject) => {
       printWindow.webContents.print(printOptions, (success, errorType) => {
         printWindow.close();
 
@@ -169,14 +188,15 @@ async function printPdfWithElectron(
           resolve();
         } else {
           console.error(`[Printer] Electron print failed: ${errorType}`);
-          reject(new Error(`Print failed: ${errorType}`));
+          reject(new Error('Druck fehlgeschlagen - bitte Drucker prüfen'));
         }
       });
-    } catch (error) {
-      console.error('[Printer] Electron print error:', error);
-      reject(error);
-    }
-  });
+    });
+  } catch (error) {
+    printWindow.close();
+    console.error('[Printer] Electron print error:', error);
+    throw error;
+  }
 }
 
 /**
@@ -190,7 +210,7 @@ export async function printPdf(
   try {
     // Verify file exists
     if (!fs.existsSync(pdfPath)) {
-      throw new Error(`PDF file not found: ${pdfPath}`);
+      throw new Error('Label-Datei nicht gefunden');
     }
 
     // If no printer specified, use default
@@ -198,8 +218,17 @@ export async function printPdf(
     if (!targetPrinter) {
       targetPrinter = await getDefaultPrinter();
       if (!targetPrinter) {
-        throw new Error('No default printer found');
+        throw new Error('Kein Drucker ausgewählt');
       }
+    }
+
+    // Validate printer exists
+    const availablePrinters = await listPrinters();
+    const printerExists = availablePrinters.some(
+      (p) => p.name === targetPrinter
+    );
+    if (!printerExists) {
+      throw new Error(`Drucker "${targetPrinter}" nicht verfügbar`);
     }
 
     console.log(`[Printer] Printing ${pdfPath} to ${targetPrinter}`);

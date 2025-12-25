@@ -1,0 +1,171 @@
+/**
+ * Account Sidebar Styles
+ */
+
+.account-sidebar {
+  background: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 280px;
+  min-width: 280px;
+}
+
+.account-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.account-sidebar-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2c3e50;
+}
+
+.account-sidebar-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-info-icon {
+  padding: 0;
+  font-size: 0.8rem;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  min-width: 24px;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+  transform: scale(1.05);
+}
+
+.account-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.account-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e9ecef;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.account-item:hover {
+  background-color: #e9ecef;
+}
+
+.account-item.active {
+  background-color: #e8f4f8;
+  border-left: 4px solid #3498db;
+  padding-left: calc(1rem - 4px);
+}
+
+.account-item.inactive {
+  opacity: 0.6;
+}
+
+.account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-email {
+  font-size: 0.75rem;
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-badge {
+  background: #3498db;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 24px;
+  text-align: center;
+}
+
+.account-actions {
+  display: none;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+}
+
+.account-item:hover .account-actions {
+  display: flex;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+}
+
+.btn-icon.btn-danger:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.btn-sm {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.8rem;
+}
+
+.account-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #6c757d;
+}
+
+.account-empty p {
+  margin: 0.5rem 0;
+}
+
+.account-empty-hint {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+

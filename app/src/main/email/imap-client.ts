@@ -35,14 +35,45 @@ export class ImapClient {
    */
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.imap = new Imap({
+      // Special configuration for Outlook/Office365
+      const isOutlook = this.config.host.includes('outlook') || this.config.host.includes('office365');
+      
+      const imapConfig: any = {
         user: this.config.username,
         password: this.config.password,
         host: this.config.host,
         port: this.config.port,
         tls: this.config.tls,
-        tlsOptions: { rejectUnauthorized: false }, // Allow self-signed certs
-      });
+        tlsOptions: { 
+          rejectUnauthorized: false,
+          servername: this.config.host, // Important for Outlook
+          minVersion: 'TLSv1.2', // Outlook requires at least TLS 1.2
+        },
+        authTimeout: 30000, // 30 seconds timeout
+        connTimeout: 30000,
+        keepalive: true,
+      };
+
+      // Outlook/Office365 specific settings
+      if (isOutlook) {
+        // Try to use PLAIN auth which works better with app passwords
+        imapConfig.autotls = 'always';
+        console.log('[IMAP] Using Outlook-specific configuration');
+      }
+
+      // Clean password (remove spaces and dashes that Microsoft adds for readability)
+      const cleanPassword = this.config.password.replace(/[\s-]/g, '');
+      if (cleanPassword !== this.config.password) {
+        console.log('[IMAP] Cleaned password (removed spaces/dashes)');
+        imapConfig.password = cleanPassword;
+      }
+
+      console.log('[IMAP] Connecting to:', this.config.host);
+      console.log('[IMAP] Using TLS:', this.config.tls);
+      console.log('[IMAP] Port:', this.config.port);
+      console.log('[IMAP] Username:', this.config.username);
+
+      this.imap = new Imap(imapConfig);
 
       this.imap.once('ready', () => {
         console.log('[IMAP] Connected successfully');
@@ -51,6 +82,12 @@ export class ImapClient {
 
       this.imap.once('error', (err: Error) => {
         console.error('[IMAP] Connection error:', err);
+        console.error('[IMAP] Error details:', {
+          message: err.message,
+          host: this.config.host,
+          port: this.config.port,
+          tls: this.config.tls,
+        });
         reject(err);
       });
 
@@ -74,6 +111,7 @@ export class ImapClient {
 
   /**
    * Search for emails matching criteria
+   * Returns sequence numbers (not UIDs)
    */
   async searchEmails(criteria: any[]): Promise<number[]> {
     if (!this.imap) {
@@ -85,7 +123,7 @@ export class ImapClient {
         if (err) {
           reject(err);
         } else {
-          resolve(results);
+          resolve(results || []);
         }
       });
     });
@@ -94,18 +132,24 @@ export class ImapClient {
   /**
    * Fetch email messages by UIDs
    */
-  async fetchMessages(uids: number[]): Promise<EmailMessage[]> {
+  /**
+   * Fetch messages by sequence numbers
+   * @param seqNums Array of sequence numbers (not UIDs)
+   */
+  async fetchMessages(seqNums: number[]): Promise<EmailMessage[]> {
     if (!this.imap) {
       throw new Error('Not connected to IMAP server');
     }
 
-    if (uids.length === 0) {
+    if (seqNums.length === 0) {
       return [];
     }
 
+    console.log(`[IMAP] Fetching ${seqNums.length} messages by sequence number...`);
+
     return new Promise((resolve, reject) => {
       const messages: EmailMessage[] = [];
-      const fetch = this.imap!.fetch(uids, {
+      const fetch = this.imap!.fetch(seqNums, {
         bodies: '',
         struct: true,
       });

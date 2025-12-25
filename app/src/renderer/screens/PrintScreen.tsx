@@ -17,6 +17,7 @@ export function PrintScreen() {
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [jobErrors, setJobErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadPrinters();
@@ -46,7 +47,8 @@ export function PrintScreen() {
       const result = await api.print.listPrinters();
       setPrinters(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load printers');
+      const errorMsg = err instanceof Error ? err.message : 'Drucker konnten nicht geladen werden';
+      setError(errorMsg);
       console.error('Failed to load printers:', err);
     } finally {
       setLoadingPrinters(false);
@@ -59,7 +61,8 @@ export function PrintScreen() {
       setJobs(result);
     } catch (err) {
       console.error('Failed to load print jobs:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load print jobs');
+      const errorMsg = err instanceof Error ? err.message : 'Druck-Jobs konnten nicht geladen werden';
+      setError(errorMsg);
     } finally {
       setLoadingJobs(false);
     }
@@ -67,15 +70,19 @@ export function PrintScreen() {
 
   const handleRetry = async (jobId: string) => {
     setActionLoading(jobId);
+    // Clear previous error
+    setJobErrors((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+
     try {
       await api.print.retry(jobId);
       await loadJobs();
     } catch (err) {
-      alert(
-        `Failed to retry job: ${
-          err instanceof Error ? err.message : 'Unknown error'
-        }`
-      );
+      const errorMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      setJobErrors((prev) => ({ ...prev, [jobId]: errorMsg }));
       console.error('Failed to retry job:', err);
     } finally {
       setActionLoading(null);
@@ -83,20 +90,24 @@ export function PrintScreen() {
   };
 
   const handleDelete = async (jobId: string) => {
-    if (!confirm('Are you sure you want to delete this print job?')) {
+    if (!confirm('Möchten Sie diesen Druck-Job wirklich löschen?')) {
       return;
     }
 
     setActionLoading(jobId);
+    // Clear previous error
+    setJobErrors((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+
     try {
       await api.print.delete(jobId);
       await loadJobs();
     } catch (err) {
-      alert(
-        `Failed to delete job: ${
-          err instanceof Error ? err.message : 'Unknown error'
-        }`
-      );
+      const errorMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      setJobErrors((prev) => ({ ...prev, [jobId]: errorMsg }));
       console.error('Failed to delete job:', err);
     } finally {
       setActionLoading(null);
@@ -295,6 +306,12 @@ export function PrintScreen() {
                     </div>
                   )}
 
+                  {jobErrors[job.id] && (
+                    <div className="print-job-action-error">
+                      <strong>Fehler:</strong> {jobErrors[job.id]}
+                    </div>
+                  )}
+
                   <div className="print-job-actions">
                     {job.status === 'failed' && (
                       <button
@@ -302,7 +319,7 @@ export function PrintScreen() {
                         onClick={() => handleRetry(job.id)}
                         disabled={actionLoading === job.id}
                       >
-                        {actionLoading === job.id ? 'Retrying...' : '🔄 Retry'}
+                        {actionLoading === job.id ? 'Wird wiederholt...' : '🔄 Wiederholen'}
                       </button>
                     )}
                     {(job.status === 'completed' || job.status === 'failed') && (
@@ -311,7 +328,7 @@ export function PrintScreen() {
                         onClick={() => handleDelete(job.id)}
                         disabled={actionLoading === job.id}
                       >
-                        {actionLoading === job.id ? 'Deleting...' : '🗑️ Delete'}
+                        {actionLoading === job.id ? 'Wird gelöscht...' : '🗑️ Löschen'}
                       </button>
                     )}
                   </div>

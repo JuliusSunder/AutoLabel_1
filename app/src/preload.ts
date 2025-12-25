@@ -9,7 +9,7 @@ import { AutoLabelAPI } from './shared/types';
  */
 const autolabelAPI: AutoLabelAPI = {
   scan: {
-    start: () => ipcRenderer.invoke('scan:start'),
+    start: (accountId) => ipcRenderer.invoke('scan:start', accountId),
     status: () => ipcRenderer.invoke('scan:status'),
     refreshVinted: () => ipcRenderer.invoke('scan:refreshVinted'),
   },
@@ -35,6 +35,15 @@ const autolabelAPI: AutoLabelAPI = {
   config: {
     get: () => ipcRenderer.invoke('config:get'),
     set: (config) => ipcRenderer.invoke('config:set', config),
+  },
+  accounts: {
+    list: () => ipcRenderer.invoke('accounts:list'),
+    create: (data) => ipcRenderer.invoke('accounts:create', data),
+    update: (id, data) => ipcRenderer.invoke('accounts:update', id, data),
+    delete: (id) => ipcRenderer.invoke('accounts:delete', id),
+    toggle: (id) => ipcRenderer.invoke('accounts:toggle', id),
+    test: (config) => ipcRenderer.invoke('accounts:test', config),
+    testExisting: (accountId) => ipcRenderer.invoke('accounts:testExisting', accountId),
   },
 };
 

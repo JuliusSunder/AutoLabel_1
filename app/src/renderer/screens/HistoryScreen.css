@@ -2,8 +2,20 @@
  * History Screen Styles
  */
 
-.history-screen {
-  /* Uses common screen styles from App.css */
+.history-screen-container {
+  display: flex;
+  height: 100%;
+  gap: 0;
+}
+
+.history-screen-container > .account-sidebar {
+  flex-shrink: 0;
+}
+
+.history-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
 }
 
 .history-actions {

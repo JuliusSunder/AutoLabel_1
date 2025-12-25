@@ -310,6 +310,53 @@ export function runMigrations(db: Database.Database): void {
     db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(5);
   }
 
+  // Migration 6: Create email_accounts table for multi-account support
+  if (version < 6) {
+    console.log('[Schema] Creating email_accounts table...');
+    
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS email_accounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        host TEXT NOT NULL,
+        port INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        encrypted_password TEXT NOT NULL,
+        tls INTEGER NOT NULL DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    console.log('[Schema] Created email_accounts table');
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(6);
+  }
+
+  // Migration 7: Add account_id column to sales table
+  if (version < 7) {
+    console.log('[Schema] Adding account_id column to sales table...');
+    
+    // Check if column already exists (safe migration)
+    const tableInfo = db.pragma('table_info(sales)');
+    const hasAccountId = tableInfo.some(
+      (col: any) => col.name === 'account_id'
+    );
+    
+    if (!hasAccountId) {
+      db.exec('ALTER TABLE sales ADD COLUMN account_id TEXT');
+      console.log('[Schema] Added account_id column to sales table');
+    }
+    
+    // Create index for account_id lookups
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_sales_account_id 
+      ON sales(account_id)
+    `);
+    
+    console.log('[Schema] Created index on sales.account_id');
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(7);
+  }
+
   // Future migrations go here:
-  // if (version < 6) { ... }
+  // if (version < 8) { ... }
 }

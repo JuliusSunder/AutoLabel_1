@@ -7,6 +7,7 @@ import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppConfig, IMAPConfig } from '../shared/types';
+import { createEmailAccount, getAllEmailAccounts } from './database/repositories/email-accounts';
 
 const CONFIG_FILE = 'config.json';
 
@@ -76,6 +77,63 @@ function decryptPassword(encryptedBase64: string): string {
 }
 
 /**
+ * Migrate old IMAP config to email_accounts table
+ */
+function migrateConfigToAccounts(): boolean {
+  try {
+    const configPath = getConfigPath();
+    
+    if (!fs.existsSync(configPath)) {
+      return false; // No config to migrate
+    }
+
+    const data = fs.readFileSync(configPath, 'utf-8');
+    const stored: StoredConfig = JSON.parse(data);
+
+    // Check if old IMAP config exists
+    if (!stored.imap) {
+      return false; // Nothing to migrate
+    }
+
+    console.log('[Config] Migrating old IMAP config to email_accounts table...');
+
+    // Check if we already have accounts (migration already done)
+    const existingAccounts = getAllEmailAccounts();
+    if (existingAccounts.length > 0) {
+      console.log('[Config] Email accounts already exist, skipping migration');
+      // Still remove old config
+      delete stored.imap;
+      fs.writeFileSync(configPath, JSON.stringify(stored, null, 2), 'utf-8');
+      return false;
+    }
+
+    // Create default account from old config
+    const imapConfig = stored.imap;
+    createEmailAccount({
+      name: 'Default Account',
+      host: imapConfig.host,
+      port: imapConfig.port,
+      username: imapConfig.username,
+      password: decryptPassword(imapConfig.encryptedPassword),
+      tls: imapConfig.tls,
+      isActive: true,
+    });
+
+    console.log('[Config] Created default email account from old IMAP config');
+
+    // Remove old IMAP config from file
+    delete stored.imap;
+    fs.writeFileSync(configPath, JSON.stringify(stored, null, 2), 'utf-8');
+    
+    console.log('[Config] Migration complete - removed old IMAP config from file');
+    return true;
+  } catch (error) {
+    console.error('[Config] Failed to migrate config:', error);
+    return false;
+  }
+}
+
+/**
  * Load configuration from disk
  */
 export function loadConfig(): AppConfig {
@@ -90,13 +148,18 @@ export function loadConfig(): AppConfig {
     const data = fs.readFileSync(configPath, 'utf-8');
     const stored: StoredConfig = JSON.parse(data);
 
+    // Try to migrate old config (will only run once)
+    if (stored.imap) {
+      migrateConfigToAccounts();
+    }
+
     const config: AppConfig = {
       scanDays: stored.scanDays,
       lastScanDate: stored.lastScanDate,
       defaultFooterConfig: stored.defaultFooterConfig,
     };
 
-    // Decrypt IMAP password if present
+    // Legacy: Decrypt IMAP password if present (shouldn't be after migration)
     if (stored.imap) {
       config.imap = {
         host: stored.imap.host,

@@ -14,9 +14,9 @@ let scanProgress = 0;
  * Register scan IPC handlers
  */
 export function registerScanHandlers(): void {
-  // Start email scan
-  ipcMain.handle('scan:start', async (): Promise<ScanResult> => {
-    console.log('[IPC] scan:start called');
+  // Start email scan (with optional account filter)
+  ipcMain.handle('scan:start', async (_event, accountId?: string): Promise<ScanResult> => {
+    console.log('[IPC] scan:start called', accountId ? `for account: ${accountId}` : 'for all accounts');
 
     if (isScanning) {
       return {
@@ -30,7 +30,7 @@ export function registerScanHandlers(): void {
     scanProgress = 0;
 
     try {
-      const result = await scanMailbox();
+      const result = await scanMailbox(accountId);
       return result;
     } catch (error) {
       console.error('[IPC] Scan failed:', error);

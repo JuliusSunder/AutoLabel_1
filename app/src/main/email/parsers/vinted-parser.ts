@@ -144,11 +144,26 @@ export function parseVintedEmail(email: EmailMessage): VintedParseResult {
 }
 
 /**
- * Check if an email is from Vinted
+ * Check if an email is from Vinted (including forwarded emails)
  */
 export function isVintedEmail(email: EmailMessage): boolean {
   const from = email.from.toLowerCase();
-  return from.includes('vinted') || from.includes('kleiderkreisel');
+  const subject = email.subject.toLowerCase();
+  const body = email.body.toLowerCase();
+  
+  // Check if from Vinted directly
+  if (from.includes('vinted') || from.includes('kleiderkreisel')) {
+    return true;
+  }
+  
+  // Check for forwarded Vinted emails
+  // They have "Versandschein" in subject and Vinted in body
+  if (subject.includes('versandschein') && 
+      (body.includes('vinted') || body.includes('kleiderkreisel'))) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**

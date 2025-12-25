@@ -11,12 +11,12 @@ import type { Sale } from '../../shared/types';
  * Register sales IPC handlers
  */
 export function registerSalesHandlers(): void {
-  // List sales with optional date filtering
+  // List sales with optional date and account filtering
   ipcMain.handle(
     'sales:list',
     async (
       _event,
-      params: { fromDate?: string; toDate?: string }
+      params: { fromDate?: string; toDate?: string; accountId?: string }
     ): Promise<Sale[]> => {
       console.log('[IPC] sales:list called with params:', params);
 
