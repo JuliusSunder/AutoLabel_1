@@ -14,6 +14,22 @@ import type { Sale, EmailAccount } from '../../shared/types';
 import type { EmailProviderInfo } from '../data/email-providers';
 import './HistoryScreen.css';
 
+type TimeFilter = 
+  | 'all' 
+  | 'today' 
+  | 'thisWeek' 
+  | 'last7Days' 
+  | 'thisMonth' 
+  | 'lastMonth' 
+  | 'last30Days';
+
+interface FilterState {
+  timeFilter: TimeFilter;
+  shippingCompany?: string;
+  platform?: string;
+  hasAttachments?: boolean;
+}
+
 interface HistoryScreenProps {
   onSelectSales: (saleIds: string[]) => void;
 }
@@ -28,6 +44,15 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
+  // Scan state
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ scannedCount: number; newSales: number; errors?: string[] } | null>(null);
+  
+  // Filter state
+  const [filters, setFilters] = useState<FilterState>({
+    timeFilter: 'all',
+  });
+  
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<EmailAccount | null>(null);
@@ -40,9 +65,9 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   }, []);
 
   useEffect(() => {
-    // Reload sales when account filter changes
+    // Reload sales when account filter or date filters change
     loadSales();
-  }, [selectedAccountId]);
+  }, [selectedAccountId, filters]);
 
   const loadAccounts = async () => {
     try {
@@ -63,15 +88,98 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     }
   };
 
+  // Calculate date range based on time filter
+  const getDateRange = (filter: TimeFilter): { fromDate?: string; toDate?: string } => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    
+    switch (filter) {
+      case 'today': {
+        const start = new Date(today);
+        start.setHours(0, 0, 0, 0);
+        return {
+          fromDate: start.toISOString().split('T')[0],
+          toDate: today.toISOString().split('T')[0],
+        };
+      }
+      case 'thisWeek': {
+        const start = new Date(today);
+        const dayOfWeek = start.getDay();
+        const diff = start.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Monday
+        start.setDate(diff);
+        start.setHours(0, 0, 0, 0);
+        return {
+          fromDate: start.toISOString().split('T')[0],
+          toDate: today.toISOString().split('T')[0],
+        };
+      }
+      case 'last7Days': {
+        const start = new Date(today);
+        start.setDate(start.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
+        return {
+          fromDate: start.toISOString().split('T')[0],
+          toDate: today.toISOString().split('T')[0],
+        };
+      }
+      case 'thisMonth': {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        return {
+          fromDate: start.toISOString().split('T')[0],
+          toDate: today.toISOString().split('T')[0],
+        };
+      }
+      case 'lastMonth': {
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
+        return {
+          fromDate: lastMonth.toISOString().split('T')[0],
+          toDate: lastDay.toISOString().split('T')[0],
+        };
+      }
+      case 'last30Days': {
+        const start = new Date(today);
+        start.setDate(start.getDate() - 29);
+        start.setHours(0, 0, 0, 0);
+        return {
+          fromDate: start.toISOString().split('T')[0],
+          toDate: today.toISOString().split('T')[0],
+        };
+      }
+      default:
+        return {};
+    }
+  };
+
   const loadSales = async () => {
     setLoading(true);
     setError(null);
 
     try {
+      const dateRange = getDateRange(filters.timeFilter);
+      
       const result = await api.sales.list({
         accountId: selectedAccountId || undefined,
+        fromDate: dateRange.fromDate,
+        toDate: dateRange.toDate,
       });
-      setSales(result);
+      
+      // Client-side filtering for shipping company, platform, attachments
+      let filtered = result;
+      
+      if (filters.shippingCompany) {
+        filtered = filtered.filter(s => s.shippingCompany === filters.shippingCompany);
+      }
+      
+      if (filters.platform) {
+        filtered = filtered.filter(s => s.platform === filters.platform);
+      }
+      
+      if (filters.hasAttachments !== undefined) {
+        filtered = filtered.filter(s => s.hasAttachments === filters.hasAttachments);
+      }
+      
+      setSales(filtered);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sales');
       console.error('Failed to load sales:', err);
@@ -98,6 +206,51 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   const handlePrepareLabels = () => {
     if (selectedIds.size > 0) {
       onSelectSales(Array.from(selectedIds));
+    }
+  };
+
+  const handleSelectAll = () => {
+    const selectableSales = sales.filter(s => s.hasAttachments);
+    const allSelected = selectableSales.length > 0 && selectableSales.every(s => selectedIds.has(s.id));
+    
+    if (allSelected) {
+      // Deselect all
+      setSelectedIds(new Set());
+    } else {
+      // Select all selectable
+      setSelectedIds(new Set(selectableSales.map(s => s.id)));
+    }
+  };
+
+  const resetFilters = () => {
+    setFilters({ timeFilter: 'all' });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.timeFilter !== 'all' || 
+           filters.shippingCompany !== undefined || 
+           filters.platform !== undefined || 
+           filters.hasAttachments !== undefined;
+  };
+
+  const handleScan = async () => {
+    setIsScanning(true);
+    setError(null);
+    setScanResult(null);
+
+    try {
+      const result = await api.scan.refreshVinted();
+      setScanResult(result);
+      console.log('Scan completed:', result);
+      
+      // Reload accounts and sales
+      await loadAccounts();
+      await loadSales();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Scan failed');
+      console.error('Scan failed:', err);
+    } finally {
+      setIsScanning(false);
     }
   };
 
@@ -187,7 +340,117 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
       />
 
       <div className="history-main">
-        <h2 className="screen-title">Sales History</h2>
+        <div className="history-header">
+          <h2 className="screen-title">Sales History</h2>
+          <button
+            className="btn btn-primary scan-button"
+            onClick={handleScan}
+            disabled={isScanning}
+          >
+            {isScanning ? '🔄 Scanning...' : '📧 Scan'}
+          </button>
+        </div>
+
+        {scanResult && (
+          <div className="scan-result-banner">
+            ✅ Scan complete! <strong>{scanResult.scannedCount}</strong> emails checked, <strong>{scanResult.newSales}</strong> sales imported.
+            {scanResult.errors && scanResult.errors.length > 0 && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                ⚠️ Errors: {scanResult.errors.join(', ')}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Filter Bar */}
+        <div className="history-filters">
+          <div className="filter-group">
+            <label>📅</label>
+            <select 
+              value={filters.timeFilter} 
+              onChange={(e) => setFilters({...filters, timeFilter: e.target.value as TimeFilter})}
+              className="filter-select"
+            >
+              <option value="all">Alle Zeiten</option>
+              <option value="today">Heute</option>
+              <option value="thisWeek">Diese Woche</option>
+              <option value="last7Days">Letzte 7 Tage</option>
+              <option value="thisMonth">Dieser Monat</option>
+              <option value="lastMonth">Letzter Monat</option>
+              <option value="last30Days">Letzte 30 Tage</option>
+            </select>
+          </div>
+          
+          <div className="filter-group">
+            <label>📦</label>
+            <select 
+              value={filters.shippingCompany || 'all'} 
+              onChange={(e) => setFilters({
+                ...filters, 
+                shippingCompany: e.target.value === 'all' ? undefined : e.target.value
+              })}
+              className="filter-select"
+            >
+              <option value="all">Alle Versandarten</option>
+              <option value="GLS">GLS</option>
+              <option value="Hermes">Hermes</option>
+              <option value="DHL">DHL</option>
+              <option value="DPD">DPD</option>
+              <option value="UPS">UPS</option>
+            </select>
+          </div>
+          
+          <div className="filter-group">
+            <label>🏪</label>
+            <select 
+              value={filters.platform || 'all'} 
+              onChange={(e) => setFilters({
+                ...filters, 
+                platform: e.target.value === 'all' ? undefined : e.target.value
+              })}
+              className="filter-select"
+            >
+              <option value="all">Alle Plattformen</option>
+              <option value="Vinted/Kleiderkreisel">Vinted</option>
+            </select>
+          </div>
+          
+          <div className="filter-group">
+            <label>📎</label>
+            <select 
+              value={filters.hasAttachments === undefined ? 'all' : filters.hasAttachments ? 'with' : 'without'} 
+              onChange={(e) => setFilters({
+                ...filters, 
+                hasAttachments: e.target.value === 'all' ? undefined : e.target.value === 'with'
+              })}
+              className="filter-select"
+            >
+              <option value="all">Alle Status</option>
+              <option value="with">Mit Label</option>
+              <option value="without">Ohne Label</option>
+            </select>
+          </div>
+          
+          <div className="filter-actions">
+            {sales.length > 0 && sales.some(s => s.hasAttachments) && (
+              <label className="select-all-label">
+                <input 
+                  type="checkbox"
+                  checked={sales.filter(s => s.hasAttachments).length > 0 && 
+                          sales.filter(s => s.hasAttachments).every(s => selectedIds.has(s.id))}
+                  onChange={handleSelectAll}
+                />
+                <span>Alle auswählen</span>
+              </label>
+            )}
+            
+            {hasActiveFilters() && (
+              <button className="btn-reset-filters" onClick={resetFilters} title="Filter zurücksetzen">
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
 
         {loading && (
           <div className="card">

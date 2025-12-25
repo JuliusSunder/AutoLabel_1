@@ -4,16 +4,15 @@
  */
 
 import React, { useState } from 'react';
-import { ScanScreen } from './screens/ScanScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { PrepareScreen } from './screens/PrepareScreen';
 import { PrintScreen } from './screens/PrintScreen';
 import './App.css';
 
-type Screen = 'scan' | 'history' | 'prepare' | 'print';
+type Screen = 'history' | 'prepare' | 'print';
 
 export function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('scan');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('history');
   const [selectedSaleIds, setSelectedSaleIds] = useState<string[]>([]);
 
   const handleSelectSales = (saleIds: string[]) => {
@@ -31,16 +30,10 @@ export function App() {
         <h1 className="app-title">AutoLabel</h1>
         <div className="app-tabs">
           <button
-            className={currentScreen === 'scan' ? 'active' : ''}
-            onClick={() => setCurrentScreen('scan')}
-          >
-            Scan
-          </button>
-          <button
             className={currentScreen === 'history' ? 'active' : ''}
             onClick={() => setCurrentScreen('history')}
           >
-            History
+            Sales
           </button>
           <button
             className={currentScreen === 'prepare' ? 'active' : ''}
@@ -59,7 +52,6 @@ export function App() {
       </nav>
 
       <main className="app-content">
-        {currentScreen === 'scan' && <ScanScreen />}
         {currentScreen === 'history' && (
           <HistoryScreen onSelectSales={handleSelectSales} />
         )}

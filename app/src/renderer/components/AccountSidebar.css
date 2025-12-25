@@ -4,12 +4,13 @@
 
 .account-sidebar {
   background: #f8f9fa;
-  border-right: 1px solid #dee2e6;
+  border-right: 2px solid #dee2e6;
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 280px;
-  min-width: 280px;
+  width: 260px;
+  min-width: 260px;
+  flex-shrink: 0;
 }
 
 .account-sidebar-header {

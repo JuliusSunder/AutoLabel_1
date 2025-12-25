@@ -283,15 +283,21 @@ async function scanVintedSingleAccount(account: EmailAccount, scanDays: number):
 
     for (const email of emails) {
       try {
-        if (!isVintedEmail(email)) {
-          console.log(`[Vinted Scanner] ⚠️  Skipping non-Vinted email: ${email.subject.substring(0, 40)}...`);
-          continue;
-        }
-
+        // ============ TEMPORÄRER DEBUG-MODUS ============
+        // Filter temporär deaktiviert, um zu testen ob Emails importiert werden
+        console.log('\n[Vinted Scanner] 🔍 DEBUG - Email gefunden:');
+        console.log(`  📧 Betreff: ${email.subject}`);
+        console.log(`  👤 Absender: ${email.from}`);
+        console.log(`  📎 PDF-Anhang vorhanden: ${hasVintedShippingLabel(email) ? 'JA' : 'NEIN'}`);
+        
+        // Temporär: Nur PDF-Check, kein Absender-Check
         if (!hasVintedShippingLabel(email)) {
-          console.log(`[Vinted Scanner] ⏭️  Skipping Vinted email without PDF: ${email.subject.substring(0, 40)}...`);
+          console.log(`  ⏭️  ÜBERSPRUNGEN: Keine PDF-Anhänge`);
           continue;
         }
+        
+        console.log(`  ✅ WIRD VERARBEITET: Email hat PDF-Anhang`);
+        // ============ ENDE DEBUG-MODUS ============
 
         const result = parseVintedEmail(email);
 
