@@ -6,10 +6,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
+import { toast } from '../hooks/useToast';
 import { SaleCard } from '../components/SaleCard';
 import { AccountSidebar } from '../components/AccountSidebar';
 import { AccountModal } from '../components/AccountModal';
 import { EmailProviderInfoModal } from '../components/EmailProviderInfoModal';
+import { EmptyState } from '../components/EmptyState';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '../../components/ui/dropdown-menu';
+import { Button } from '../../components/ui/button';
+import { Checkbox } from '../../components/ui/checkbox';
+import { Label } from '../../components/ui/label';
+import { ChevronDown, Search, X, Loader2, Inbox, Mail } from 'lucide-react';
 import type { Sale, EmailAccount } from '../../shared/types';
 import type { EmailProviderInfo } from '../data/email-providers';
 import './HistoryScreen.css';
@@ -25,8 +36,8 @@ type TimeFilter =
 
 interface FilterState {
   timeFilter: TimeFilter;
-  shippingCompany?: string;
-  platform?: string;
+  shippingCompanies: string[];
+  platforms: string[];
   hasAttachments?: boolean;
 }
 
@@ -44,14 +55,29 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
+  // Search state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+  
   // Scan state
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{ scannedCount: number; newSales: number; errors?: string[] } | null>(null);
   
+  // Quick Start state
+  const [isQuickStarting, setIsQuickStarting] = useState(false);
+  
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
     timeFilter: 'all',
+    shippingCompanies: [],
+    platforms: [],
   });
+  
+  // Dropdown open states for chevron rotation
+  const [timeDropdownOpen, setTimeDropdownOpen] = useState(false);
+  const [carrierDropdownOpen, setCarrierDropdownOpen] = useState(false);
+  const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
+  const [labelDropdownOpen, setLabelDropdownOpen] = useState(false);
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -67,7 +93,16 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   useEffect(() => {
     // Reload sales when account filter or date filters change
     loadSales();
-  }, [selectedAccountId, filters]);
+  }, [selectedAccountId, filters, debouncedSearchQuery]);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const loadAccounts = async () => {
     try {
@@ -167,12 +202,29 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
       // Client-side filtering for shipping company, platform, attachments
       let filtered = result;
       
-      if (filters.shippingCompany) {
-        filtered = filtered.filter(s => s.shippingCompany === filters.shippingCompany);
+      // Filter by search query
+      if (debouncedSearchQuery.trim()) {
+        const query = debouncedSearchQuery.toLowerCase();
+        filtered = filtered.filter(s => 
+          (s.itemTitle && s.itemTitle.toLowerCase().includes(query)) ||
+          (s.productNumber && s.productNumber.toLowerCase().includes(query)) ||
+          (s.trackingNumber && s.trackingNumber.toLowerCase().includes(query)) ||
+          (s.buyerName && s.buyerName.toLowerCase().includes(query))
+        );
       }
       
-      if (filters.platform) {
-        filtered = filtered.filter(s => s.platform === filters.platform);
+      // Filter by shipping companies (only if some are selected)
+      if (filters.shippingCompanies.length > 0) {
+        filtered = filtered.filter(s => 
+          s.shippingCompany && filters.shippingCompanies.includes(s.shippingCompany)
+        );
+      }
+      
+      // Filter by platforms (only if some are selected)
+      if (filters.platforms.length > 0) {
+        filtered = filtered.filter(s => 
+          s.platform && filters.platforms.includes(s.platform)
+        );
       }
       
       if (filters.hasAttachments !== undefined) {
@@ -209,6 +261,61 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     }
   };
 
+  const handleQuickStart = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsQuickStarting(true);
+    setError(null);
+
+    try {
+      // Get default footer config from localStorage
+      const savedFooterConfig = localStorage.getItem('defaultFooterConfig');
+      const defaultConfig = savedFooterConfig 
+        ? JSON.parse(savedFooterConfig) 
+        : {
+            includeProductNumber: true,
+            includeItemTitle: false,
+            includeDate: true,
+          };
+
+      // Prepare labels with default config
+      const result = await api.labels.prepare({
+        saleIds: Array.from(selectedIds),
+        footerConfig: defaultConfig,
+      });
+
+      // Get default printer
+      const savedDefaultPrinter = localStorage.getItem('defaultPrinter');
+      const printerList = await api.print.listPrinters();
+      const printerToUse = savedDefaultPrinter && printerList.find((p) => p.name === savedDefaultPrinter)
+        ? savedDefaultPrinter
+        : printerList.find((p) => p.isDefault)?.name || printerList[0]?.name;
+
+      if (!printerToUse) {
+        throw new Error('No printer available');
+      }
+
+      // Start printing immediately
+      const labelIds = result.map((l: any) => l.id);
+      await api.print.start({ labelIds, printerName: printerToUse });
+      
+      toast.success('Quick Start successful!', {
+        description: `${labelIds.length} label(s) sent to ${printerToUse}`
+      });
+
+      // Reload sales to update status
+      await loadSales();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Quick Start failed');
+      toast.error('Quick Start failed', {
+        description: err instanceof Error ? err.message : 'Unknown error'
+      });
+      console.error('Quick Start failed:', err);
+    } finally {
+      setIsQuickStarting(false);
+    }
+  };
+
   const handleSelectAll = () => {
     const selectableSales = sales.filter(s => s.hasAttachments);
     const allSelected = selectableSales.length > 0 && selectableSales.every(s => selectedIds.has(s.id));
@@ -223,14 +330,23 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   };
 
   const resetFilters = () => {
-    setFilters({ timeFilter: 'all' });
+    setFilters({ 
+      timeFilter: 'all',
+      shippingCompanies: [],
+      platforms: [],
+    });
   };
 
   const hasActiveFilters = () => {
     return filters.timeFilter !== 'all' || 
-           filters.shippingCompany !== undefined || 
-           filters.platform !== undefined || 
-           filters.hasAttachments !== undefined;
+           filters.shippingCompanies.length > 0 || 
+           filters.platforms.length > 0 || 
+           filters.hasAttachments !== undefined ||
+           searchQuery.trim() !== '';
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
   };
 
   const handleScan = async () => {
@@ -294,7 +410,9 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
       await loadSales();
     } catch (err) {
       console.error('Failed to delete account:', err);
-      alert('Failed to delete account: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      toast.error('Failed to delete account', {
+        description: err instanceof Error ? err.message : 'Unknown error'
+      });
     }
   };
 
@@ -304,7 +422,9 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
       await loadAccounts();
     } catch (err) {
       console.error('Failed to toggle account:', err);
-      alert('Failed to toggle account: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      toast.error('Failed to toggle account', {
+        description: err instanceof Error ? err.message : 'Unknown error'
+      });
     }
   };
 
@@ -343,11 +463,12 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
         <div className="history-header">
           <h2 className="screen-title">Sales History</h2>
           <button
-            className="btn btn-primary scan-button"
+            className="btn btn-secondary scan-button"
             onClick={handleScan}
             disabled={isScanning}
           >
-            {isScanning ? '🔄 Scanning...' : '📧 Scan'}
+            {isScanning && <Loader2 className="animate-spin" size={16} style={{ marginRight: '0.5rem' }} />}
+            {isScanning ? 'Scanning...' : 'Scan'}
           </button>
         </div>
 
@@ -362,73 +483,217 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
           </div>
         )}
 
+        {/* Search Bar */}
+        <div className="history-search">
+          <div className="search-input-wrapper">
+            <Search className="search-icon" size={18} />
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search by title, product number, tracking, buyer..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search sales"
+            />
+            {searchQuery && (
+              <button
+                className="search-clear-btn"
+                onClick={handleClearSearch}
+                aria-label="Clear search"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <div className="search-results-count">
+              {sales.length} result{sales.length !== 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
+
         {/* Filter Bar */}
         <div className="history-filters">
           <div className="filter-group">
-            <label>📅</label>
-            <select 
-              value={filters.timeFilter} 
-              onChange={(e) => setFilters({...filters, timeFilter: e.target.value as TimeFilter})}
-              className="filter-select"
-            >
-              <option value="all">Alle Zeiten</option>
-              <option value="today">Heute</option>
-              <option value="thisWeek">Diese Woche</option>
-              <option value="last7Days">Letzte 7 Tage</option>
-              <option value="thisMonth">Dieser Monat</option>
-              <option value="lastMonth">Letzter Monat</option>
-              <option value="last30Days">Letzte 30 Tage</option>
-            </select>
+            <DropdownMenu onOpenChange={(open) => setTimeDropdownOpen(open)}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="filter-select" style={{ justifyContent: 'space-between' }}>
+                  {filters.timeFilter === 'all' ? 'Alle Zeiten' :
+                   filters.timeFilter === 'today' ? 'Heute' :
+                   filters.timeFilter === 'thisWeek' ? 'Diese Woche' :
+                   filters.timeFilter === 'last7Days' ? 'Letzte 7 Tage' :
+                   filters.timeFilter === 'thisMonth' ? 'Dieser Monat' :
+                   filters.timeFilter === 'lastMonth' ? 'Letzter Monat' :
+                   filters.timeFilter === 'last30Days' ? 'Letzte 30 Tage' : 'Alle Zeiten'}
+                  <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${timeDropdownOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+                <div className="px-2 py-1 space-y-2">
+                  {[
+                    { value: 'all', label: 'Alle Zeiten' },
+                    { value: 'today', label: 'Heute' },
+                    { value: 'thisWeek', label: 'Diese Woche' },
+                    { value: 'last7Days', label: 'Letzte 7 Tage' },
+                    { value: 'thisMonth', label: 'Dieser Monat' },
+                    { value: 'lastMonth', label: 'Letzter Monat' },
+                    { value: 'last30Days', label: 'Letzte 30 Tage' },
+                  ].map((option) => (
+                    <div key={option.value} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`dropdown-time-${option.value}`}
+                        checked={filters.timeFilter === option.value}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFilters({
+                              ...filters,
+                              timeFilter: option.value as TimeFilter
+                            });
+                          }
+                        }}
+                      />
+                      <Label 
+                        htmlFor={`dropdown-time-${option.value}`} 
+                        className="text-sm font-normal cursor-pointer flex-1"
+                      >
+                        {option.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
           <div className="filter-group">
-            <label>📦</label>
-            <select 
-              value={filters.shippingCompany || 'all'} 
-              onChange={(e) => setFilters({
-                ...filters, 
-                shippingCompany: e.target.value === 'all' ? undefined : e.target.value
-              })}
-              className="filter-select"
-            >
-              <option value="all">Alle Versandarten</option>
-              <option value="GLS">GLS</option>
-              <option value="Hermes">Hermes</option>
-              <option value="DHL">DHL</option>
-              <option value="DPD">DPD</option>
-              <option value="UPS">UPS</option>
-            </select>
+            <DropdownMenu onOpenChange={(open) => setCarrierDropdownOpen(open)}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="filter-select" style={{ justifyContent: 'space-between' }}>
+                  {filters.shippingCompanies.length > 0 
+                    ? `${filters.shippingCompanies.length} ausgewählt` 
+                    : 'Versanddienstleister'}
+                  <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${carrierDropdownOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+                <div className="px-2 py-1 space-y-2">
+                  {['GLS', 'Hermes', 'DHL', 'DPD', 'UPS'].map((carrier) => (
+                    <div key={carrier} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`dropdown-carrier-${carrier}`}
+                        checked={filters.shippingCompanies.includes(carrier)}
+                        onCheckedChange={(checked) => {
+                          setFilters({
+                            ...filters,
+                            shippingCompanies: checked
+                              ? [...filters.shippingCompanies, carrier]
+                              : filters.shippingCompanies.filter(c => c !== carrier)
+                          });
+                        }}
+                      />
+                      <Label 
+                        htmlFor={`dropdown-carrier-${carrier}`} 
+                        className="text-sm font-normal cursor-pointer flex-1"
+                      >
+                        {carrier}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
           <div className="filter-group">
-            <label>🏪</label>
-            <select 
-              value={filters.platform || 'all'} 
-              onChange={(e) => setFilters({
-                ...filters, 
-                platform: e.target.value === 'all' ? undefined : e.target.value
-              })}
-              className="filter-select"
-            >
-              <option value="all">Alle Plattformen</option>
-              <option value="Vinted/Kleiderkreisel">Vinted</option>
-            </select>
+            <DropdownMenu onOpenChange={(open) => setPlatformDropdownOpen(open)}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="filter-select" style={{ justifyContent: 'space-between' }}>
+                  {filters.platforms.length > 0 
+                    ? filters.platforms.join(', ').replace('Vinted/Kleiderkreisel', 'Vinted')
+                    : 'Plattformen'}
+                  <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${platformDropdownOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+                <div className="px-2 py-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="dropdown-platform-vinted"
+                      checked={filters.platforms.includes('Vinted/Kleiderkreisel')}
+                      onCheckedChange={(checked) => {
+                        setFilters({
+                          ...filters,
+                          platforms: checked
+                            ? [...filters.platforms, 'Vinted/Kleiderkreisel']
+                            : filters.platforms.filter(p => p !== 'Vinted/Kleiderkreisel')
+                        });
+                      }}
+                    />
+                    <Label 
+                      htmlFor="dropdown-platform-vinted" 
+                      className="text-sm font-normal cursor-pointer flex-1"
+                    >
+                      Vinted
+                    </Label>
+                  </div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
           <div className="filter-group">
-            <label>📎</label>
-            <select 
-              value={filters.hasAttachments === undefined ? 'all' : filters.hasAttachments ? 'with' : 'without'} 
-              onChange={(e) => setFilters({
-                ...filters, 
-                hasAttachments: e.target.value === 'all' ? undefined : e.target.value === 'with'
-              })}
-              className="filter-select"
-            >
-              <option value="all">Alle Status</option>
-              <option value="with">Mit Label</option>
-              <option value="without">Ohne Label</option>
-            </select>
+            <DropdownMenu onOpenChange={(open) => setLabelDropdownOpen(open)}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="filter-select" style={{ justifyContent: 'space-between' }}>
+                  {filters.hasAttachments === true 
+                    ? 'Mit Label' 
+                    : filters.hasAttachments === false 
+                    ? 'Ohne Label' 
+                    : 'Label Status'}
+                  <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${labelDropdownOpen ? 'rotate-180' : ''}`} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+                <div className="px-2 py-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="dropdown-with-label"
+                      checked={filters.hasAttachments === true}
+                      onCheckedChange={(checked) => {
+                        setFilters({
+                          ...filters,
+                          hasAttachments: checked ? true : undefined
+                        });
+                      }}
+                    />
+                    <Label 
+                      htmlFor="dropdown-with-label" 
+                      className="text-sm font-normal cursor-pointer flex-1"
+                    >
+                      Mit Label
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="dropdown-without-label"
+                      checked={filters.hasAttachments === false}
+                      onCheckedChange={(checked) => {
+                        setFilters({
+                          ...filters,
+                          hasAttachments: checked ? false : undefined
+                        });
+                      }}
+                    />
+                    <Label 
+                      htmlFor="dropdown-without-label" 
+                      className="text-sm font-normal cursor-pointer flex-1"
+                    >
+                      Ohne Label
+                    </Label>
+                  </div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
           <div className="filter-actions">
@@ -469,16 +734,36 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
           </div>
         )}
 
-        {!loading && !error && sales.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-state-icon">📦</div>
-            <p className="empty-state-text">No sales found</p>
-            <p className="empty-state-hint">
-              {selectedAccountId
-                ? 'No sales for this account. Try selecting a different account.'
-                : 'Scan your emails to extract sales and shipping labels'}
-            </p>
-          </div>
+        {!loading && !error && accounts.length === 0 && (
+          <EmptyState
+            icon={<Mail size={64} />}
+            title="No email accounts configured"
+            description="Add an email account to start scanning for shipping labels"
+            action={
+              <button className="btn btn-primary" onClick={handleAddAccount}>
+                Add Account
+              </button>
+            }
+          />
+        )}
+
+        {!loading && !error && accounts.length > 0 && sales.length === 0 && (
+          <EmptyState
+            icon={<Inbox size={64} />}
+            title="No sales found"
+            description={
+              selectedAccountId
+                ? 'No sales for this account. Try selecting a different account or scan for new emails.'
+                : 'Start scanning your emails to find shipping labels'
+            }
+            action={
+              accounts.length > 0 && (
+                <button className="btn btn-primary" onClick={handleScan} disabled={isScanning}>
+                  {isScanning ? 'Scanning...' : 'Start Scan'}
+                </button>
+              )
+            }
+          />
         )}
 
         {!loading && !error && sales.length > 0 && (
@@ -488,12 +773,23 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                 <p>
                   <strong>{selectedIds.size}</strong> sale(s) selected
                 </p>
-                <button
-                  className="btn btn-success"
-                  onClick={handlePrepareLabels}
-                >
-                  Prepare Labels →
-                </button>
+                <div className="history-action-buttons">
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleQuickStart}
+                    disabled={isQuickStarting}
+                    title="Prepare and print immediately with default settings"
+                  >
+                    {isQuickStarting ? 'Quick Starting...' : '⚡ Quick Start'}
+                  </button>
+                  <button
+                    className="btn btn-success"
+                    onClick={handlePrepareLabels}
+                    disabled={isQuickStarting}
+                  >
+                    Prepare Labels →
+                  </button>
+                </div>
               </div>
             )}
 

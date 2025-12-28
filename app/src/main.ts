@@ -1,12 +1,50 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { autoUpdater } from 'electron-updater';
 import { getDatabase, closeDatabase } from './main/database/db';
 import { registerAllHandlers } from './main/ipc/handlers';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
+}
+
+// Configure auto-updater (only in production)
+if (app.isPackaged) {
+  // Configure update feed
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'your-username', // TODO: Replace with your GitHub username
+    repo: 'autolabel',       // TODO: Replace with your repository name
+  });
+
+  // Log update events
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[AutoUpdater] Checking for updates...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[AutoUpdater] Update available:', info.version);
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('[AutoUpdater] No updates available. Current version:', info.version);
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[AutoUpdater] Error:', err);
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    console.log(`[AutoUpdater] Download progress: ${progressObj.percent}%`);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[AutoUpdater] Update downloaded:', info.version);
+    // The update will be installed on app restart
+    // You can show a notification to the user here
+  });
 }
 
 // Initialize database and IPC handlers when app is ready
@@ -26,6 +64,14 @@ app.on('ready', () => {
 
   // Create main window
   createWindow();
+
+  // Check for updates after window is created (only in production)
+  if (app.isPackaged) {
+    // Wait a bit before checking for updates
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 5000);
+  }
 });
 
 // Clean up on quit
@@ -39,6 +85,7 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    title: 'AutoLabel',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },

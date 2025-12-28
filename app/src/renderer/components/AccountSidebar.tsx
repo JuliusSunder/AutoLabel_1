@@ -5,6 +5,8 @@
 
 import React from 'react';
 import type { EmailAccount } from '../../shared/types';
+import { Button } from '../../components/ui/button';
+import { Info, List, PauseCircle, PlayCircle, Edit2, Trash2 } from 'lucide-react';
 import './AccountSidebar.css';
 
 interface AccountSidebarProps {
@@ -37,15 +39,17 @@ export function AccountSidebar({
       <div className="account-sidebar-header">
         <h3>Email Accounts</h3>
         <div className="account-sidebar-actions">
-          <button 
-            className="btn btn-sm btn-secondary btn-info-icon" 
+          <Button 
+            variant="ghost" 
+            size="icon-sm"
+            className="rounded-full"
             onClick={onShowProviderInfo}
             title="Email-Anbieter Kompatibilität"
           >
-            ℹ️
-          </button>
+            <Info className="h-4 w-4" />
+          </Button>
           <button 
-            className="btn btn-sm btn-primary" 
+            className="btn btn-sm btn-secondary" 
             onClick={onAddAccount}
             title="Add new email account"
           >
@@ -59,9 +63,12 @@ export function AccountSidebar({
         className={`account-item ${selectedAccountId === null ? 'active' : ''}`}
         onClick={() => onSelectAccount(null)}
       >
-        <div className="account-info">
-          <div className="account-name">📧 All Accounts</div>
-          <div className="account-email">Show all sales</div>
+        <div className="account-info" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <List className="h-4 w-4" />
+          <div>
+            <div className="account-name">All Accounts</div>
+            <div className="account-email">Show all sales</div>
+          </div>
         </div>
         {totalSales > 0 && (
           <div className="account-badge">{totalSales}</div>
@@ -74,6 +81,14 @@ export function AccountSidebar({
           <div className="account-empty">
             <p>No accounts configured</p>
             <p className="account-empty-hint">Add an email account to get started</p>
+            <button 
+              className="btn btn-sm btn-secondary" 
+              onClick={onShowProviderInfo}
+              style={{ marginTop: '1rem' }}
+              title="Show email provider compatibility info"
+            >
+              How?
+            </button>
           </div>
         ) : (
           accounts.map((account) => {
@@ -107,7 +122,7 @@ export function AccountSidebar({
                     }}
                     title={account.isActive ? 'Deactivate account' : 'Activate account'}
                   >
-                    {account.isActive ? '⏸️' : '▶️'}
+                    {account.isActive ? <PauseCircle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
                   </button>
                   <button
                     className="btn-icon"
@@ -117,7 +132,7 @@ export function AccountSidebar({
                     }}
                     title="Edit account"
                   >
-                    ✏️
+                    <Edit2 className="h-4 w-4" />
                   </button>
                   <button
                     className="btn-icon btn-danger"
@@ -129,7 +144,7 @@ export function AccountSidebar({
                     }}
                     title="Delete account"
                   >
-                    🗑️
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>

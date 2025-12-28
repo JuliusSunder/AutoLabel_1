@@ -146,10 +146,15 @@ export interface AutoLabelAPI {
     getBySale: (saleId: string) => Promise<Attachment[]>;
   };
   print: {
+    addToQueue: (params: {
+      labelIds: string[];
+      printerName?: string;
+    }) => Promise<PrintJob>;
     start: (params: {
       labelIds: string[];
       printerName?: string;
     }) => Promise<PrintJob>;
+    startQueued: (jobId: string) => Promise<void>;
     status: (jobId: string) => Promise<PrintJob | null>;
     listJobs: () => Promise<PrintJob[]>;
     retry: (jobId: string) => Promise<void>;

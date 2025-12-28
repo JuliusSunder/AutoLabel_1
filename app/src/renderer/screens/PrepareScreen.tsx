@@ -5,7 +5,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
+import { toast } from '../hooks/useToast';
+import { Tag } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
 import type { FooterConfig, Sale, PrinterInfo } from '../../shared/types';
+import { CarrierBadge, PlatformBadge } from '../../components/ui/carrier-badge';
 import './PrepareScreen.css';
 
 interface PrepareScreenProps {
@@ -49,6 +53,16 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
 
     if (selectedSaleIds.length > 0) {
       loadSales();
+      
+      // Load default footer config from localStorage
+      const savedFooterConfig = localStorage.getItem('defaultFooterConfig');
+      if (savedFooterConfig) {
+        try {
+          setFooterConfig(JSON.parse(savedFooterConfig));
+        } catch (err) {
+          console.error('Failed to parse footer config:', err);
+        }
+      }
     } else {
       setSales([]);
     }
@@ -119,9 +133,16 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
       try {
         const printerList = await api.print.listPrinters();
         setPrinters(printerList);
-        // Auto-select default printer
-        const defaultPrinter = printerList.find((p) => p.isDefault);
-        setSelectedPrinter(defaultPrinter?.name || printerList[0]?.name);
+        
+        // Check if there's a saved default printer in localStorage
+        const savedDefaultPrinter = localStorage.getItem('defaultPrinter');
+        if (savedDefaultPrinter && printerList.find((p) => p.name === savedDefaultPrinter)) {
+          setSelectedPrinter(savedDefaultPrinter);
+        } else {
+          // Fallback to system default or first printer
+          const defaultPrinter = printerList.find((p) => p.isDefault);
+          setSelectedPrinter(defaultPrinter?.name || printerList[0]?.name);
+        }
       } catch (err) {
         console.error('Failed to load printers:', err);
         // Don't block the user if printers can't be loaded
@@ -131,6 +152,27 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
       console.error('Failed to prepare labels:', err);
     } finally {
       setIsPreparing(false);
+    }
+  };
+
+  const handleAddToQueue = async () => {
+    if (preparedLabels.length === 0) return;
+
+    setIsPrinting(true);
+    setError(null);
+
+    try {
+      const labelIds = preparedLabels.map((l) => l.id);
+      await api.print.addToQueue({ labelIds, printerName: selectedPrinter });
+      console.log('Added to queue with printer:', selectedPrinter);
+      toast.success('Labels added to queue!', {
+        description: 'Go to Print Queue tab to start printing.'
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add to queue');
+      console.error('Failed to add to queue:', err);
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -144,7 +186,9 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
       const labelIds = preparedLabels.map((l) => l.id);
       await api.print.start({ labelIds, printerName: selectedPrinter });
       console.log('Print job started with printer:', selectedPrinter);
-      alert('Print job started! Check the Print Queue tab for status.');
+      toast.success('Print job started!', {
+        description: 'Note: Windows cannot reliably detect if printer is offline. Please verify the labels were printed.'
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start printing');
       console.error('Failed to print:', err);
@@ -157,13 +201,11 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
     return (
       <div className="screen prepare-screen">
         <h2 className="screen-title">Prepare Labels</h2>
-        <div className="empty-state">
-          <div className="empty-state-icon">🏷️</div>
-          <p className="empty-state-text">No sales selected</p>
-          <p className="empty-state-hint">
-            Select sales from the History screen to prepare labels
-          </p>
-        </div>
+        <EmptyState
+          icon={<Tag size={64} />}
+          title="No sales selected"
+          description="Select sales from the History screen to prepare labels for printing"
+        />
       </div>
     );
   }
@@ -194,8 +236,8 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
                 
                 <div className="selected-sale-info">
                   <strong>{sale.itemTitle || 'Untitled Sale'}</strong>
-                  {sale.shippingCompany && <span className="sale-shipping-badge">{sale.shippingCompany}</span>}
-                  {sale.platform && <span className="sale-platform-badge">{sale.platform}</span>}
+                  {sale.shippingCompany && <CarrierBadge carrier={sale.shippingCompany} />}
+                  {sale.platform && <PlatformBadge platform={sale.platform} />}
                   {sale.productNumber && <span className="sale-product-number">#{sale.productNumber}</span>}
                 </div>
                 {onRemoveSale && (
@@ -267,7 +309,7 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
 
               {printers.length > 0 && (
                 <div className="prepare-printer-selection">
-                  <label htmlFor="printer-select">Drucker auswählen:</label>
+                  <label htmlFor="printer-select">Select Printer:</label>
                   <select
                     id="printer-select"
                     value={selectedPrinter || ''}
@@ -283,13 +325,23 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
                 </div>
               )}
 
-              <button
-                className="btn btn-success"
-                onClick={handlePrint}
-                disabled={isPrinting || !selectedPrinter}
-              >
-                {isPrinting ? 'Starting Print...' : '🖨️ Print Now'}
-              </button>
+              <div className="prepare-print-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleAddToQueue}
+                  disabled={isPrinting || !selectedPrinter}
+                  title="Add to print queue"
+                >
+                  {isPrinting ? 'Adding...' : '➕ Add to Queue'}
+                </button>
+                <button
+                  className="btn btn-success"
+                  onClick={handlePrint}
+                  disabled={isPrinting || !selectedPrinter}
+                >
+                  {isPrinting ? 'Starting Print...' : '🖨️ Print Now'}
+                </button>
+              </div>
             </div>
             
             <div className="prepare-preview">

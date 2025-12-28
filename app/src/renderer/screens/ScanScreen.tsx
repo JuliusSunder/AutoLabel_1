@@ -50,12 +50,12 @@ export function ScanScreen() {
         </p>
         
         <button
-          className="btn btn-primary scan-button"
+          className="btn btn-secondary scan-button"
           onClick={handleRefresh}
           disabled={isRefreshing}
           style={{ marginTop: '15px' }}
         >
-          {isRefreshing ? '🔄 Refreshing...' : '🔄 Refresh Vinted Sales'}
+          {isRefreshing ? 'Refreshing...' : 'Refresh Vinted Sales'}
         </button>
 
         {result && (

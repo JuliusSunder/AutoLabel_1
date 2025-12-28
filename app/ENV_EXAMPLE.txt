@@ -1,0 +1,39 @@
+# AutoLabel Environment Variables
+# Kopiere diese Datei zu .env und fülle die Werte aus
+
+# ======================
+# Code Signing (Optional)
+# ======================
+# Pfad zum Code Signing Certificate (.pfx)
+# Nur für Production Builds mit Code Signing
+WINDOWS_CERT_PATH=C:\path\to\certificate.pfx
+
+# Passwort für das Code Signing Certificate
+WINDOWS_CERT_PASSWORD=your-certificate-password
+
+
+# ======================
+# GitHub Publishing (Optional)
+# ======================
+# GitHub Personal Access Token für automatisches Publishing
+# Erstellen: GitHub → Settings → Developer settings → Personal access tokens
+# Scopes: repo, write:packages
+GITHUB_TOKEN=your-github-personal-access-token
+
+
+# ======================
+# Development (Optional)
+# ======================
+# Electron Developer Tools
+# ELECTRON_ENABLE_LOGGING=1
+# ELECTRON_ENABLE_STACK_DUMPING=1
+
+
+# ======================
+# Notizen
+# ======================
+# - .env wird NICHT in Git committed (siehe .gitignore)
+# - Für Production: Environment Variables direkt setzen
+#   Windows: $env:GITHUB_TOKEN="your-token"
+#   Linux/Mac: export GITHUB_TOKEN="your-token"
+

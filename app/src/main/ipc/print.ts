@@ -6,6 +6,8 @@
 import { ipcMain } from 'electron';
 import {
   startPrintJob,
+  addToQueue,
+  startQueuedJob,
   getPrintJobStatus,
   getAllPrintJobs,
   retryPrintJob,
@@ -18,6 +20,29 @@ import type { PrintJob, PrinterInfo } from '../../shared/types';
  * Register print IPC handlers
  */
 export function registerPrintHandlers(): void {
+  // Add to print queue (without immediately printing)
+  ipcMain.handle(
+    'print:addToQueue',
+    async (
+      _event,
+      params: { labelIds: string[]; printerName?: string }
+    ): Promise<PrintJob> => {
+      console.log('[IPC] print:addToQueue called with:', params);
+
+      try {
+        const printJob = await addToQueue(
+          params.labelIds,
+          params.printerName
+        );
+        console.log(`[IPC] Added to queue: ${printJob.id}`);
+        return printJob;
+      } catch (error) {
+        console.error('[IPC] Failed to add to queue:', error);
+        throw error;
+      }
+    }
+  );
+
   // Start print job
   ipcMain.handle(
     'print:start',
@@ -85,6 +110,19 @@ export function registerPrintHandlers(): void {
     }
   });
 
+  // Start a queued job
+  ipcMain.handle('print:startQueued', async (_event, jobId: string): Promise<void> => {
+    console.log('[IPC] print:startQueued called for job:', jobId);
+
+    try {
+      await startQueuedJob(jobId);
+      console.log(`[IPC] Successfully started queued job: ${jobId}`);
+    } catch (error) {
+      console.error('[IPC] Failed to start queued job:', error);
+      throw error;
+    }
+  });
+
   // Retry a print job
   ipcMain.handle('print:retry', async (_event, jobId: string): Promise<void> => {
     console.log('[IPC] print:retry called for job:', jobId);
@@ -103,7 +141,7 @@ export function registerPrintHandlers(): void {
     console.log('[IPC] print:delete called for job:', jobId);
 
     try {
-      deletePrintJob(jobId);
+      await deletePrintJob(jobId);
       console.log(`[IPC] Successfully deleted print job: ${jobId}`);
     } catch (error) {
       console.error('[IPC] Failed to delete print job:', error);

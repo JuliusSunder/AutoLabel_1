@@ -5,6 +5,7 @@
 
 import React from 'react';
 import type { Sale } from '../../shared/types';
+import { CarrierBadge, PlatformBadge } from '../../components/ui/carrier-badge';
 import './SaleCard.css';
 
 interface SaleCardProps {
@@ -33,10 +34,10 @@ export function SaleCard({ sale, selected, onToggleSelect, disabled }: SaleCardP
           </h4>
           <div className="sale-badges">
             {sale.shippingCompany && (
-              <span className="sale-shipping">{sale.shippingCompany}</span>
+              <CarrierBadge carrier={sale.shippingCompany} />
             )}
             {sale.platform && (
-              <span className="sale-platform">{sale.platform}</span>
+              <PlatformBadge platform={sale.platform} />
             )}
           </div>
         </div>

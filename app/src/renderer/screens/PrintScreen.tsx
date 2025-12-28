@@ -5,6 +5,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
+import { AlertCircle, Printer } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../../components/ui/tooltip';
+import { EmptyState } from '../components/EmptyState';
 import type { PrinterInfo, PrintJob } from '../../shared/types';
 import './PrintScreen.css';
 
@@ -16,10 +24,11 @@ export function PrintScreen() {
   const [loadingPrinters, setLoadingPrinters] = useState(true);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<{ jobId: string; action: string } | null>(null);
   const [jobErrors, setJobErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    // Load printers and jobs on mount
     loadPrinters();
     loadJobs();
   }, []);
@@ -47,7 +56,7 @@ export function PrintScreen() {
       const result = await api.print.listPrinters();
       setPrinters(result);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Drucker konnten nicht geladen werden';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to load printers';
       setError(errorMsg);
       console.error('Failed to load printers:', err);
     } finally {
@@ -61,7 +70,7 @@ export function PrintScreen() {
       setJobs(result);
     } catch (err) {
       console.error('Failed to load print jobs:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Druck-Jobs konnten nicht geladen werden';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to load print jobs';
       setError(errorMsg);
     } finally {
       setLoadingJobs(false);
@@ -69,7 +78,7 @@ export function PrintScreen() {
   };
 
   const handleRetry = async (jobId: string) => {
-    setActionLoading(jobId);
+    setActionLoading({ jobId, action: 'retry' });
     // Clear previous error
     setJobErrors((prev) => {
       const next = { ...prev };
@@ -81,7 +90,7 @@ export function PrintScreen() {
       await api.print.retry(jobId);
       await loadJobs();
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setJobErrors((prev) => ({ ...prev, [jobId]: errorMsg }));
       console.error('Failed to retry job:', err);
     } finally {
@@ -89,12 +98,33 @@ export function PrintScreen() {
     }
   };
 
+  const handleStartQueued = async (jobId: string) => {
+    setActionLoading({ jobId, action: 'start' });
+    // Clear previous error
+    setJobErrors((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+
+    try {
+      await api.print.startQueued(jobId);
+      await loadJobs();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      setJobErrors((prev) => ({ ...prev, [jobId]: errorMsg }));
+      console.error('Failed to start queued job:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDelete = async (jobId: string) => {
-    if (!confirm('Möchten Sie diesen Druck-Job wirklich löschen?')) {
+    if (!confirm('Do you really want to delete this print job?')) {
       return;
     }
 
-    setActionLoading(jobId);
+    setActionLoading({ jobId, action: 'delete' });
     // Clear previous error
     setJobErrors((prev) => {
       const next = { ...prev };
@@ -106,7 +136,7 @@ export function PrintScreen() {
       await api.print.delete(jobId);
       await loadJobs();
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unbekannter Fehler';
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setJobErrors((prev) => ({ ...prev, [jobId]: errorMsg }));
       console.error('Failed to delete job:', err);
     } finally {
@@ -164,7 +194,17 @@ export function PrintScreen() {
       <h2 className="screen-title">Print Queue</h2>
 
       <div className="card print-printers">
-        <h3>Available Printers</h3>
+        <div className="print-printers-header">
+          <h3>Available Printers</h3>
+          <button 
+            className="btn btn-secondary btn-small"
+            onClick={loadPrinters}
+            disabled={loadingPrinters}
+            title="Refresh printers"
+          >
+            {loadingPrinters ? '⟳' : '🔄'} Refresh
+          </button>
+        </div>
 
         {loadingPrinters && <p>Loading printers...</p>}
 
@@ -191,7 +231,6 @@ export function PrintScreen() {
                 {printer.isDefault && (
                   <span className="print-printer-badge">Default</span>
                 )}
-                <span className="print-printer-status">{printer.status}</span>
               </li>
             ))}
           </ul>
@@ -204,13 +243,11 @@ export function PrintScreen() {
         {loadingJobs && <p>Loading print jobs...</p>}
 
         {!loadingJobs && jobs.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-state-icon">🖨️</div>
-            <p className="empty-state-text">No print jobs</p>
-            <p className="empty-state-hint">
-              Print jobs will appear here after you start printing from the Prepare screen
-            </p>
-          </div>
+          <EmptyState
+            icon={<Printer size={64} />}
+            title="Print queue is empty"
+            description="Prepare labels in the Prepare screen to add them to the print queue"
+          />
         )}
 
         {!loadingJobs && jobs.length > 0 && (
@@ -234,6 +271,20 @@ export function PrintScreen() {
                         <span className={getStatusBadgeClass(job.status)}>
                           {getStatusText(job.status)}
                         </span>
+                        {job.status === 'failed' && job.errors && job.errors.length > 0 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="error-badge">
+                                  <AlertCircle size={14} />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{job.errors.join(', ')}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                       <div className="print-job-meta">
                         <span>Printer: {job.printerName}</span>
@@ -264,13 +315,6 @@ export function PrintScreen() {
                         {job.printedCount} / {job.totalCount} labels printed (
                         {progress}%)
                       </div>
-                    </div>
-                  )}
-
-                  {job.status === 'completed' && (
-                    <div className="print-job-summary print-job-success">
-                      ✅ Successfully printed {job.printedCount} / {job.totalCount}{' '}
-                      labels
                     </div>
                   )}
 
@@ -308,27 +352,64 @@ export function PrintScreen() {
 
                   {jobErrors[job.id] && (
                     <div className="print-job-action-error">
-                      <strong>Fehler:</strong> {jobErrors[job.id]}
+                      <strong>Error:</strong> {jobErrors[job.id]}
                     </div>
                   )}
 
                   <div className="print-job-actions">
-                    {job.status === 'failed' && (
-                      <button
-                        className="btn btn-warning"
-                        onClick={() => handleRetry(job.id)}
-                        disabled={actionLoading === job.id}
-                      >
-                        {actionLoading === job.id ? 'Wird wiederholt...' : '🔄 Wiederholen'}
-                      </button>
+                    {job.status === 'pending' && (
+                      <>
+                        <button
+                          className="btn btn-success"
+                          onClick={() => handleStartQueued(job.id)}
+                          disabled={actionLoading?.jobId === job.id}
+                        >
+                          {actionLoading?.jobId === job.id && actionLoading?.action === 'start' 
+                            ? 'Starting...' 
+                            : '▶️ Start Print'}
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => handleDelete(job.id)}
+                          disabled={actionLoading?.jobId === job.id}
+                        >
+                          {actionLoading?.jobId === job.id && actionLoading?.action === 'delete' 
+                            ? 'Deleting...' 
+                            : '🗑️ Delete'}
+                        </button>
+                      </>
                     )}
-                    {(job.status === 'completed' || job.status === 'failed') && (
+                    {job.status === 'failed' && (
+                      <>
+                        <button
+                          className="btn btn-warning"
+                          onClick={() => handleRetry(job.id)}
+                          disabled={actionLoading?.jobId === job.id}
+                        >
+                          {actionLoading?.jobId === job.id && actionLoading?.action === 'retry' 
+                            ? 'Retrying...' 
+                            : '🔄 Retry'}
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => handleDelete(job.id)}
+                          disabled={actionLoading?.jobId === job.id}
+                        >
+                          {actionLoading?.jobId === job.id && actionLoading?.action === 'delete' 
+                            ? 'Deleting...' 
+                            : '🗑️ Delete'}
+                        </button>
+                      </>
+                    )}
+                    {job.status === 'completed' && (
                       <button
                         className="btn btn-danger"
                         onClick={() => handleDelete(job.id)}
-                        disabled={actionLoading === job.id}
+                        disabled={actionLoading?.jobId === job.id}
                       >
-                        {actionLoading === job.id ? 'Wird gelöscht...' : '🗑️ Löschen'}
+                        {actionLoading?.jobId === job.id && actionLoading?.action === 'delete' 
+                          ? 'Deleting...' 
+                          : '🗑️ Delete'}
                       </button>
                     )}
                   </div>

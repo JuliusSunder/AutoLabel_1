@@ -4,6 +4,9 @@
 
 .prepare-screen {
   /* Uses common screen styles from App.css */
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .prepare-summary {
@@ -154,13 +157,15 @@
 }
 
 .prepare-actions {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .prepare-button {
-  font-size: 1.1rem;
-  padding: 1rem 2rem;
-  min-width: 200px;
+  width: 100%;
+  font-size: 1rem;
+  padding: 0.875rem 1.5rem;
 }
 
 .prepare-success {
@@ -218,6 +223,19 @@
 
 .prepare-success .btn {
   margin-top: 1rem;
+}
+
+.prepare-print-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.prepare-print-actions .btn {
+  margin-top: 0;
+  flex: 0 1 auto;
 }
 
 .prepare-hint {

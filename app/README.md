@@ -44,8 +44,30 @@ Tech stack
 ```bash
 npm install
 npm start
+```
 
-Repo layout (this project)
+## Build & Distribution
+
+### Production Build
+
+```bash
+npm run make
+```
+
+Output: `out/make/squirrel.windows/x64/AutoLabel-1.0.0 Setup.exe`
+
+### Quick Start
+
+See [QUICK_START.md](QUICK_START.md) for common tasks.
+
+### Documentation
+
+- **[BUILD.md](BUILD.md)** - Complete Build & Distribution Guide
+- **[RELEASE.md](RELEASE.md)** - Release Process
+- **[TESTING.md](TESTING.md)** - Testing Checklist
+- **[CHANGELOG.md](CHANGELOG.md)** - Version History
+
+## Repo layout (this project)
 This repo uses the default Electron Forge + Vite template structure:
 -src/ main + preload + renderer entrypoints (template-provided)
 -forge.config.ts packaging/config

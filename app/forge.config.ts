@@ -7,19 +7,63 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { PublisherGithub } from '@electron-forge/publisher-github';
+import 'dotenv/config';
 
 const config: ForgeConfig = {
   packagerConfig: {
+    name: 'AutoLabel',
+    executableName: 'autolabel',
+    icon: './icons/icon_256x256', // Electron Forge will add .ico/.icns automatically
+    appCopyright: 'Copyright © 2025 JuliusSunder',
+    appBundleId: 'com.autolabel.app',
     asar: {
       unpack: '**/*.{node,dll}', // Don't pack native modules in ASAR
+    },
+    // Windows Metadata (shown in file properties)
+    win32metadata: {
+      CompanyName: 'AutoLabel',
+      FileDescription: 'AutoLabel - Shipping Label Management',
+      ProductName: 'AutoLabel',
+      InternalName: 'autolabel',
     },
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      name: 'AutoLabel',
+      authors: 'JuliusSunder',
+      description: 'Automated shipping label management for resellers',
+      iconUrl: 'https://autolabel.app/logo/logo.png',
+      setupIcon: './icons/icon.ico',
+      // Code Signing Configuration (Self-Signed Certificate)
+      // ⚠️ WICHTIG: Nur für Testing/Development!
+      // Für Production: Professionelles Certificate von vertrauenswürdiger CA verwenden
+      certificateFile: process.env.WINDOWS_CERT_PATH || undefined,
+      certificatePassword: process.env.WINDOWS_CERT_PASSWORD || undefined,
+      signingHashAlgorithms: ['sha256'],
+    }),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({
+      options: {
+        name: 'autolabel',
+        productName: 'AutoLabel',
+        genericName: 'Label Manager',
+        description: 'Automated shipping label management for resellers',
+        categories: ['Office', 'Utility'],
+        icon: './icons/icon_256x256.png',
+      },
+    }),
+    new MakerDeb({
+      options: {
+        name: 'autolabel',
+        productName: 'AutoLabel',
+        genericName: 'Label Manager',
+        description: 'Automated shipping label management for resellers',
+        categories: ['Office', 'Utility'],
+        icon: './icons/icon_256x256.png',
+      },
+    }),
   ],
   plugins: [
     // Auto-unpack native modules (sharp, better-sqlite3, etc.)
@@ -57,6 +101,20 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
+    }),
+  ],
+  publishers: [
+    new PublisherGithub({
+      repository: {
+        owner: 'your-username', // TODO: Replace with your GitHub username
+        name: 'autolabel',      // TODO: Replace with your repository name
+      },
+      // GitHub Personal Access Token wird aus Environment Variable gelesen
+      // Setze GITHUB_TOKEN vor dem Publishing:
+      // Windows: $env:GITHUB_TOKEN="your-token"; npm run publish
+      // Linux/Mac: GITHUB_TOKEN=your-token npm run publish
+      prerelease: false,
+      draft: true, // Creates draft release, you can review before publishing
     }),
   ],
 };

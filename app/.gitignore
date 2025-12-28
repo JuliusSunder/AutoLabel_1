@@ -60,6 +60,18 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
+.env.local
+.env.production
+
+# Code Signing Certificates (NIEMALS committen!)
+certs/*.pfx
+certs/*.p12
+certs/*.pem
+certs/*.key
+certs/*.crt
+certs/*.cer
+certs/*.bak
+certs/*.backup
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

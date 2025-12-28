@@ -1,0 +1,19 @@
+# ⚠️ WICHTIG: Certificates NIEMALS committen!
+# Diese Dateien enthalten sensible Daten und Passwörter
+
+# Certificate Files
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+
+# Backup Files
+*.bak
+*.backup
+
+# Allow README
+!README.md
+!.gitignore
+

@@ -4,10 +4,24 @@
 
 .print-screen {
   /* Uses common screen styles from App.css */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .print-printers {
   margin-bottom: 2rem;
+}
+
+.print-printers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.print-printers-header h3 {
+  color: #2c3e50;
+  margin: 0;
 }
 
 .print-printers h3 {
@@ -67,8 +81,30 @@
 }
 
 .print-printer-status {
-  color: #7f8c8d;
   font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.print-printer-status.status-ready {
+  color: #28a745;
+  background: #d4edda;
+}
+
+.print-printer-status.status-offline {
+  color: #dc3545;
+  background: #f8d7da;
+}
+
+.print-printer-status.status-printing {
+  color: #007bff;
+  background: #cce5ff;
+}
+
+.print-printer-status.status-unknown {
+  color: #6c757d;
+  background: #e9ecef;
 }
 
 .print-queue {
@@ -196,23 +232,41 @@
 }
 
 .print-progress-bar {
-  height: 8px;
-  background: #ecf0f1;
-  border-radius: 4px;
+  height: 3px;
+  background: hsl(var(--muted));
+  border-radius: 2px;
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
 
 .print-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3498db, #2ecc71);
+  background: hsl(var(--primary));
   transition: width 0.3s ease;
 }
 
 .print-progress-text {
   font-size: 0.85rem;
-  color: #7f8c8d;
+  color: hsl(var(--muted-foreground));
   text-align: center;
+}
+
+/* Error Badge */
+.error-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-radius: 50%;
+  cursor: help;
+  transition: all 0.15s ease;
+}
+
+.error-badge:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px hsl(var(--destructive) / 0.3);
 }
 
 /* Job Summary */

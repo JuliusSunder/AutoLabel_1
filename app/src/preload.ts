@@ -25,7 +25,9 @@ const autolabelAPI: AutoLabelAPI = {
     getBySale: (saleId) => ipcRenderer.invoke('attachments:getBySale', saleId),
   },
   print: {
+    addToQueue: (params) => ipcRenderer.invoke('print:addToQueue', params),
     start: (params) => ipcRenderer.invoke('print:start', params),
+    startQueued: (jobId) => ipcRenderer.invoke('print:startQueued', jobId),
     status: (jobId) => ipcRenderer.invoke('print:status', jobId),
     listJobs: () => ipcRenderer.invoke('print:listJobs'),
     retry: (jobId) => ipcRenderer.invoke('print:retry', jobId),
