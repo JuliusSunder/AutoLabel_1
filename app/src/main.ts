@@ -15,8 +15,8 @@ if (app.isPackaged) {
   // Configure update feed
   autoUpdater.setFeedURL({
     provider: 'github',
-    owner: 'your-username', // TODO: Replace with your GitHub username
-    repo: 'autolabel',       // TODO: Replace with your repository name
+    owner: 'JuliusSunder', // TODO: Replace with your GitHub username
+    repo: 'AutoLabel_1',       // TODO: Replace with your repository name
   });
 
   // Log update events

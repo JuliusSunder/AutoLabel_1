@@ -18,8 +18,13 @@ const config: ForgeConfig = {
     appCopyright: 'Copyright © 2025 JuliusSunder',
     appBundleId: 'com.autolabel.app',
     asar: {
-      unpack: '**/*.{node,dll}', // Don't pack native modules in ASAR
+      unpack: '**/*.{node,dll,dylib,so}', // Don't pack native modules in ASAR
     },
+    // Ensure native modules are included
+    ignore: [
+      /^\/\.vscode\//,
+      /^\/\.git\//,
+    ],
     // Windows Metadata (shown in file properties)
     win32metadata: {
       CompanyName: 'AutoLabel',
@@ -106,8 +111,8 @@ const config: ForgeConfig = {
   publishers: [
     new PublisherGithub({
       repository: {
-        owner: 'your-username', // TODO: Replace with your GitHub username
-        name: 'autolabel',      // TODO: Replace with your repository name
+        owner: 'JuliusSunder', // TODO: Replace with your GitHub username
+        name: 'AutoLabel_1',      // TODO: Replace with your repository name
       },
       // GitHub Personal Access Token wird aus Environment Variable gelesen
       // Setze GITHUB_TOKEN vor dem Publishing:
