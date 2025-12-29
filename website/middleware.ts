@@ -1,35 +1,14 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { auth } from "@/app/lib/auth";
 
-export async function middleware(request: NextRequest) {
-  const session = await auth();
-  const isAuthenticated = !!session?.user;
-
-  // Protected routes
-  const protectedRoutes = ["/dashboard", "/download"];
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
-
-  // Redirect to login if not authenticated
-  if (isProtectedRoute && !isAuthenticated) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+export function middleware(req: any) {
+  const p = req.nextUrl.pathname;
+  const c = req.cookies.get("__Secure-authjs.session-token") || req.cookies.get("authjs.session-token");
+  if ((p.startsWith("/dashboard") || p.startsWith("/download")) && !c) {
+    return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(p)}`, req.url));
   }
-
-  // Redirect to dashboard if authenticated and trying to access login/register
-  const authRoutes = ["/login", "/register"];
-  const isAuthRoute = authRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
-
-  if (isAuthRoute && isAuthenticated) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  if ((p.startsWith("/login") || p.startsWith("/register")) && c) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
-
-  return NextResponse.next();
 }
 
 export const config = {
