@@ -4,6 +4,15 @@ import { prisma } from "@/app/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if DATABASE_URL is configured
+    if (!process.env.DATABASE_URL) {
+      console.error("DATABASE_URL is not configured!");
+      return NextResponse.json(
+        { error: "Datenbank-Konfiguration fehlt. Bitte kontaktieren Sie den Support." },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
     const { email, password, name } = body;
 
@@ -80,8 +89,22 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Registration error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Log detailed error information
+    console.error("Error details:", {
+      message: errorMessage,
+      stack: errorStack,
+      databaseUrl: process.env.DATABASE_URL ? "Set" : "Missing",
+    });
+    
     return NextResponse.json(
-      { error: "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut." },
+      { 
+        error: "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+        // Include error details in development
+        ...(process.env.NODE_ENV === "development" && { details: errorMessage })
+      },
       { status: 500 }
     );
   }
