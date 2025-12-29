@@ -41,6 +41,8 @@ const config: ForgeConfig = {
       description: 'Automated shipping label management for resellers',
       iconUrl: 'https://autolabel.app/logo/logo.png',
       setupIcon: './icons/icon.ico',
+      // Explicitly set the app ID to prevent conflicts
+      setupExe: 'AutoLabel-Setup.exe',
       // Code Signing Configuration (Self-Signed Certificate)
       // ⚠️ WICHTIG: Nur für Testing/Development!
       // Für Production: Professionelles Certificate von vertrauenswürdiger CA verwenden

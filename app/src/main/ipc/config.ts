@@ -16,6 +16,8 @@ import {
 } from '../database/repositories/email-accounts';
 import { ImapClient } from '../email/imap-client';
 import { getEmailAccount } from '../database/repositories/email-accounts';
+import { logError, logInfo, logDebug, sanitizeForLog } from '../utils/logger';
+import { getUserFriendlyError } from '../utils/error-messages';
 
 /**
  * Register config IPC handlers
@@ -24,9 +26,12 @@ export function registerConfigHandlers(): void {
   // Get configuration
   ipcMain.handle('config:get', async (): Promise<AppConfig> => {
     console.log('[IPC] config:get called');
+    logDebug('Loading configuration');
 
     try {
       const config = loadConfig();
+      logDebug('Configuration loaded successfully');
+      
       // Don't send password to renderer for security
       if (config.imap) {
         return {
@@ -40,13 +45,17 @@ export function registerConfigHandlers(): void {
       return config;
     } catch (error) {
       console.error('[IPC] Error loading config:', error);
-      throw error;
+      logError('Failed to load configuration', error);
+      
+      const userFriendlyMessage = getUserFriendlyError(error);
+      throw new Error(userFriendlyMessage);
     }
   });
 
   // Set configuration
   ipcMain.handle('config:set', async (_event, partial: Partial<AppConfig>): Promise<void> => {
     console.log('[IPC] config:set called');
+    logInfo('Saving configuration', { keys: Object.keys(partial) });
 
     try {
       // Load current config
@@ -68,9 +77,15 @@ export function registerConfigHandlers(): void {
 
       saveConfig(updated);
       console.log('[IPC] Configuration saved successfully');
+      logInfo('Configuration saved successfully');
     } catch (error) {
       console.error('[IPC] Error saving config:', error);
-      throw error;
+      logError('Failed to save configuration', error, { 
+        keys: Object.keys(partial),
+      });
+      
+      const userFriendlyMessage = getUserFriendlyError(error);
+      throw new Error(userFriendlyMessage);
     }
   });
 
@@ -94,15 +109,24 @@ export function registerConfigHandlers(): void {
   // Create new email account
   ipcMain.handle('accounts:create', async (_event, data: Omit<EmailAccount, 'id' | 'createdAt'>): Promise<EmailAccount> => {
     console.log('[IPC] accounts:create called');
+    logInfo('Creating email account', sanitizeForLog({ 
+      username: data.username,
+      host: data.host,
+      provider: data.provider,
+    }));
 
     try {
       // Check for duplicate username
       if (accountExistsByUsername(data.username)) {
-        throw new Error(`An account with username "${data.username}" already exists`);
+        throw new Error(`Ein Account mit dem Benutzernamen "${data.username}" existiert bereits`);
       }
 
       const account = createEmailAccount(data);
       console.log(`[IPC] Created email account: ${account.id}`);
+      logInfo('Email account created', { 
+        accountId: account.id,
+        username: account.username,
+      });
       
       // Return without password
       return {
@@ -111,7 +135,13 @@ export function registerConfigHandlers(): void {
       };
     } catch (error) {
       console.error('[IPC] Error creating account:', error);
-      throw error;
+      logError('Failed to create email account', error, sanitizeForLog({ 
+        username: data.username,
+        host: data.host,
+      }));
+      
+      const userFriendlyMessage = getUserFriendlyError(error);
+      throw new Error(userFriendlyMessage);
     }
   });
 
@@ -162,6 +192,11 @@ export function registerConfigHandlers(): void {
   // Test account connection
   ipcMain.handle('accounts:test', async (_event, config: { host: string; port: number; username: string; password: string; tls: boolean }): Promise<{ success: boolean; error?: string }> => {
     console.log('[IPC] accounts:test called for:', config.username);
+    logInfo('Testing email account connection', sanitizeForLog({ 
+      username: config.username,
+      host: config.host,
+      port: config.port,
+    }));
 
     try {
       const client = new ImapClient(config);
@@ -169,12 +204,21 @@ export function registerConfigHandlers(): void {
       await client.disconnect();
       
       console.log('[IPC] Account connection test successful');
+      logInfo('Email account connection test successful', { 
+        username: config.username,
+      });
       return { success: true };
     } catch (error) {
       console.error('[IPC] Account connection test failed:', error);
+      logError('Email account connection test failed', error, sanitizeForLog({ 
+        username: config.username,
+        host: config.host,
+      }));
+      
+      const userFriendlyMessage = getUserFriendlyError(error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: userFriendlyMessage,
       };
     }
   });

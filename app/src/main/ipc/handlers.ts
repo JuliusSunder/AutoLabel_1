@@ -9,6 +9,8 @@ import { registerLabelsHandlers } from './labels';
 import { registerAttachmentsHandlers } from './attachments';
 import { registerPrintHandlers } from './print';
 import { registerConfigHandlers } from './config';
+import { registerLoggingHandlers } from './logging';
+import { registerLicenseHandlers } from './license';
 
 /**
  * Register all IPC handlers
@@ -17,6 +19,8 @@ import { registerConfigHandlers } from './config';
 export function registerAllHandlers(): void {
   console.log('[IPC] Registering all IPC handlers...');
 
+  registerLoggingHandlers();
+  registerLicenseHandlers();
   registerScanHandlers();
   registerSalesHandlers();
   registerLabelsHandlers();

@@ -33,6 +33,24 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by ErrorBoundary:', error, errorInfo);
+    
+    // Log error to main process
+    if (window.autolabel?.log?.error) {
+      window.autolabel.log.error(
+        'Renderer error caught by ErrorBoundary',
+        {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        },
+        {
+          componentStack: errorInfo.componentStack,
+          source: 'ErrorBoundary',
+        }
+      ).catch((logError) => {
+        console.error('Failed to log error to main process:', logError);
+      });
+    }
   }
 
   handleReload = () => {
@@ -79,7 +97,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 color: 'hsl(var(--foreground))',
               }}
             >
-              Something went wrong
+              Ein Fehler ist aufgetreten
             </h2>
             <p
               style={{
@@ -89,7 +107,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 lineHeight: 1.6,
               }}
             >
-              An unexpected error occurred. Please try reloading the app.
+              Ein unerwarteter Fehler ist aufgetreten. Bitte laden Sie die Anwendung neu.
             </p>
             {isDevelopment && this.state.error && (
               <div
@@ -146,7 +164,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
               }}
             >
-              Reload App
+              App neu laden
             </button>
           </div>
         </div>

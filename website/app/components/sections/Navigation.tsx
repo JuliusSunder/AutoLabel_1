@@ -1,13 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { Button } from '../ui/Button';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
+import { signOut } from 'next-auth/react';
+
+interface UserSession {
+  id: string;
+  email: string;
+  name: string | null;
+}
 
 export function Navigation() {
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,6 +29,27 @@ export function Navigation() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    // Fetch user session
+    fetchUserSession();
+  }, []);
+
+  const fetchUserSession = async () => {
+    try {
+      const response = await fetch('/api/auth/session');
+      const data = await response.json();
+      if (data.user) {
+        setUser(data.user);
+      }
+    } catch (error) {
+      console.error('Error fetching session:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/' });
+  };
 
   useEffect(() => {
     // Prevent body scroll when mobile menu is open
@@ -110,14 +143,68 @@ export function Navigation() {
               </button>
             </div>
 
-            {/* CTA Button */}
-            <Button
-              size="sm"
-              onClick={() => scrollToSection('pricing')}
-              className="hidden sm:inline-flex bg-accent hover:bg-accent-dark text-white border-0 shadow-lg shadow-accent/30 transition-all duration-300 hover:scale-105"
-            >
-              Get Started
-            </Button>
+            {/* Auth Buttons / User Menu */}
+            <div className="hidden sm:flex items-center gap-3">
+              {user ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-300"
+                  >
+                    <User className="w-4 h-4 text-gray-700" />
+                    <span className="text-sm font-medium text-gray-700">
+                      {user.name || user.email.split('@')[0]}
+                    </span>
+                  </button>
+                  
+                  {/* User Dropdown Menu */}
+                  {userMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setUserMenuOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                        <Link
+                          href="/dashboard"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Dashboard
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <Link href="/login">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Button
+                    size="sm"
+                    onClick={() => scrollToSection('pricing')}
+                    className="bg-accent hover:bg-accent-dark text-white border-0 shadow-lg shadow-accent/30 transition-all duration-300 hover:scale-105"
+                  >
+                    Get Started
+                  </Button>
+                </>
+              )}
+            </div>
 
             {/* Mobile Menu Button */}
             <button
@@ -197,15 +284,54 @@ export function Navigation() {
             </div>
           </nav>
 
-          {/* Mobile Menu CTA */}
+          {/* Mobile Menu Auth */}
           <div className="p-6 border-t border-gray-200">
-            <Button
-              size="sm"
-              onClick={() => scrollToSection('pricing')}
-              className="w-full bg-accent hover:bg-accent-dark text-white border-0 shadow-lg shadow-accent/30 transition-all duration-300"
-            >
-              Get Started
-            </Button>
+            {user ? (
+              <div className="space-y-3">
+                <div className="px-4 py-2 bg-gray-100 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700">
+                    {user.name || user.email}
+                  </p>
+                </div>
+                <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
+                  onClick={handleLogout}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white border-0"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Sign In
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
+                  onClick={() => scrollToSection('pricing')}
+                  className="w-full bg-accent hover:bg-accent-dark text-white border-0 shadow-lg shadow-accent/30 transition-all duration-300"
+                >
+                  Get Started
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

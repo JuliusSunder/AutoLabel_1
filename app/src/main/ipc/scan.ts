@@ -6,6 +6,8 @@
 import { ipcMain } from 'electron';
 import { scanMailbox, refreshVintedSales } from '../email/scanner';
 import type { ScanResult, ScanStatus } from '../../shared/types';
+import { logError, logInfo, logDebug } from '../utils/logger';
+import { getUserFriendlyError } from '../utils/error-messages';
 
 let isScanning = false;
 let scanProgress = 0;
@@ -17,8 +19,10 @@ export function registerScanHandlers(): void {
   // Start email scan (with optional account filter)
   ipcMain.handle('scan:start', async (_event, accountId?: string): Promise<ScanResult> => {
     console.log('[IPC] scan:start called', accountId ? `for account: ${accountId}` : 'for all accounts');
+    logInfo('Email scan started', { accountId: accountId || 'all' });
 
     if (isScanning) {
+      logDebug('Scan already in progress, rejecting new scan request');
       return {
         scannedCount: 0,
         newSales: 0,
@@ -31,13 +35,22 @@ export function registerScanHandlers(): void {
 
     try {
       const result = await scanMailbox(accountId);
+      logInfo('Email scan completed', { 
+        accountId: accountId || 'all',
+        scannedCount: result.scannedCount,
+        newSales: result.newSales,
+        hasErrors: result.errors && result.errors.length > 0,
+      });
       return result;
     } catch (error) {
       console.error('[IPC] Scan failed:', error);
+      logError('Email scan failed', error, { accountId: accountId || 'all' });
+      
+      const userFriendlyMessage = getUserFriendlyError(error);
       return {
         scannedCount: 0,
         newSales: 0,
-        errors: [error instanceof Error ? error.message : 'Unknown error'],
+        errors: [userFriendlyMessage],
       };
     } finally {
       isScanning = false;
@@ -56,17 +69,26 @@ export function registerScanHandlers(): void {
   // Refresh Vinted sales (new simplified scan)
   ipcMain.handle('scan:refreshVinted', async (): Promise<ScanResult> => {
     console.log('[IPC] scan:refreshVinted called');
+    logInfo('Vinted refresh started');
 
     try {
       const result = await refreshVintedSales();
       console.log('[IPC] Vinted refresh complete:', result);
+      logInfo('Vinted refresh completed', {
+        scannedCount: result.scannedCount,
+        newSales: result.newSales,
+        hasErrors: result.errors && result.errors.length > 0,
+      });
       return result;
     } catch (error) {
       console.error('[IPC] Vinted refresh failed:', error);
+      logError('Vinted refresh failed', error);
+      
+      const userFriendlyMessage = getUserFriendlyError(error);
       return {
         scannedCount: 0,
         newSales: 0,
-        errors: [error instanceof Error ? error.message : 'Unknown error'],
+        errors: [userFriendlyMessage],
       };
     }
   });

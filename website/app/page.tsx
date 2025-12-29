@@ -6,10 +6,12 @@ import { Pricing } from './components/sections/Pricing';
 import { FAQ } from './components/sections/FAQ';
 import { Footer } from './components/sections/Footer';
 import { ScrollToTop } from './components/ui/ScrollToTop';
+import { StructuredData } from './components/seo/StructuredData';
 
 export default function Home() {
   return (
     <>
+      <StructuredData />
       <Navigation />
       <main className="min-h-screen">
         <Hero />

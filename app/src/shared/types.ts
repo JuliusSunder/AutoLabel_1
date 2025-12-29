@@ -174,6 +174,50 @@ export interface AutoLabelAPI {
     test: (config: { host: string; port: number; username: string; password: string; tls: boolean }) => Promise<{ success: boolean; error?: string }>;
     testExisting: (accountId: string) => Promise<{ success: boolean; error?: string }>;
   };
+  log: {
+    error: (message: string, error?: any, context?: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
+    warn: (message: string, context?: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
+    info: (message: string, context?: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
+    debug: (message: string, context?: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
+    getDirectory: () => Promise<{ success: boolean; directory?: string; error?: string }>;
+    getFiles: () => Promise<{ success: boolean; files?: string[]; error?: string }>;
+  };
+  license: {
+    get: () => Promise<LicenseInfo>;
+    validate: (licenseKey: string) => Promise<{ success: boolean; error?: string; license?: LicenseInfo }>;
+    remove: () => Promise<{ success: boolean }>;
+    usage: () => Promise<UsageInfo>;
+    canCreateLabels: (count?: number) => Promise<{ allowed: boolean; reason?: string }>;
+    canBatchPrint: () => Promise<boolean>;
+    canCustomFooter: () => Promise<boolean>;
+    getLimits: () => Promise<LicenseLimits>;
+    resetUsage: () => Promise<{ success: boolean }>;
+  };
+}
+
+// ============================================================================
+// License & Usage Types
+// ============================================================================
+
+export interface LicenseInfo {
+  plan: 'free' | 'plus' | 'pro';
+  licenseKey: string | null;
+  expiresAt: string | null;
+  validatedAt: string;
+  isValid: boolean;
+}
+
+export interface UsageInfo {
+  labelsUsed: number;
+  month: string; // Format: "YYYY-MM"
+  limit: number; // -1 = unlimited
+  remaining: number; // -1 = unlimited
+}
+
+export interface LicenseLimits {
+  labelsPerMonth: number; // -1 = unlimited
+  batchPrinting: boolean;
+  customFooter: boolean;
 }
 
 // ============================================================================

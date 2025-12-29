@@ -47,6 +47,25 @@ const autolabelAPI: AutoLabelAPI = {
     test: (config) => ipcRenderer.invoke('accounts:test', config),
     testExisting: (accountId) => ipcRenderer.invoke('accounts:testExisting', accountId),
   },
+  log: {
+    error: (message, error, context) => ipcRenderer.invoke('log:error', message, error, context),
+    warn: (message, context) => ipcRenderer.invoke('log:warn', message, context),
+    info: (message, context) => ipcRenderer.invoke('log:info', message, context),
+    debug: (message, context) => ipcRenderer.invoke('log:debug', message, context),
+    getDirectory: () => ipcRenderer.invoke('log:getDirectory'),
+    getFiles: () => ipcRenderer.invoke('log:getFiles'),
+  },
+  license: {
+    get: () => ipcRenderer.invoke('license:get'),
+    validate: (licenseKey) => ipcRenderer.invoke('license:validate', licenseKey),
+    remove: () => ipcRenderer.invoke('license:remove'),
+    usage: () => ipcRenderer.invoke('license:usage'),
+    canCreateLabels: (count) => ipcRenderer.invoke('license:canCreateLabels', count),
+    canBatchPrint: () => ipcRenderer.invoke('license:canBatchPrint'),
+    canCustomFooter: () => ipcRenderer.invoke('license:canCustomFooter'),
+    getLimits: () => ipcRenderer.invoke('license:getLimits'),
+    resetUsage: () => ipcRenderer.invoke('license:resetUsage'),
+  },
 };
 
 // Expose to window object

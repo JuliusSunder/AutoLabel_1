@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Container } from '../ui/Container';
 
 export function Footer() {
@@ -61,22 +62,22 @@ export function Footer() {
 
           {/* Legal */}
           <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
+            <h4 className="font-semibold mb-4">Rechtliches</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Privacy Policy
-                </a>
+                <Link href="/datenschutz" className="text-gray-400 hover:text-white transition-colors">
+                  Datenschutzerklärung
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Terms of Service
-                </a>
+                <Link href="/agb" className="text-gray-400 hover:text-white transition-colors">
+                  AGB
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Imprint
-                </a>
+                <Link href="/impressum" className="text-gray-400 hover:text-white transition-colors">
+                  Impressum
+                </Link>
               </li>
             </ul>
           </div>
@@ -87,11 +88,11 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  About
+                  About Us
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <a href="mailto:AutoLabel@gmx.de" className="text-gray-400 hover:text-white transition-colors">
                   Contact
                 </a>
               </li>

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
-import { Check } from 'lucide-react';
-import { redirectToCheckout } from '@/app/lib/stripe';
+import { Check, CheckCircle2, Info } from 'lucide-react';
+import { redirectToCheckout, redirectToUpgradeCheckout, openCustomerPortal, upgradeSubscription } from '@/app/lib/stripe';
 
 const pricingPlans = [
   {
@@ -70,14 +71,108 @@ const pricingPlans = [
 ];
 
 export function Pricing() {
+  const router = useRouter();
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
 
-  const handleCheckout = (priceId: string | null) => {
+  useEffect(() => {
+    // Debug: Log price IDs
+    console.log('Price IDs:', {
+      plusMonthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PLUS_MONTHLY,
+      plusYearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PLUS_YEARLY,
+      proMonthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY,
+      proYearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_YEARLY,
+    });
+
+    // Check if user is authenticated and get current plan
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+        console.log('Auth check result:', { hasUser: !!data.user, user: data.user });
+        setIsAuthenticated(!!data.user);
+        
+        // Get current plan from subscription
+        if (data.user?.subscription?.plan) {
+          setCurrentPlan(data.user.subscription.plan.toLowerCase());
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleCheckout = async (priceId: string | null, plan: string) => {
+    console.log('handleCheckout called:', { priceId, plan, billingPeriod, isAuthenticated, currentPlan });
+    
     if (!priceId) {
-      alert('Free plan - no payment needed. Download the app to get started!');
+      console.warn('No priceId provided, redirecting to register');
+      // Free plan - redirect to register
+      router.push('/register');
       return;
     }
-    redirectToCheckout(priceId);
+
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      console.log('User not authenticated, redirecting to login');
+      // Redirect to login with return URL
+      router.push(`/login?callbackUrl=${encodeURIComponent('/#pricing')}`);
+      return;
+    }
+
+    const planLower = plan.toLowerCase();
+    
+    // Check if an active subscription already exists
+    if (currentPlan && currentPlan !== 'free') {
+      // Upgrade flow: Use checkout session instead of direct upgrade
+      console.log('Creating upgrade checkout session...');
+      setIsLoading(true);
+      try {
+        await redirectToUpgradeCheckout(priceId, planLower, billingPeriod);
+        // redirectToUpgradeCheckout redirects automatically, so no reload needed
+      } catch (error) {
+        console.error('Upgrade checkout error:', error);
+        if (error instanceof Error) {
+          if (error.message.includes('bereits diesen Plan') || error.message.includes('already have this plan')) {
+            alert('You already have this plan.');
+          } else if (error.message.includes('Downgrade')) {
+            alert(error.message);
+          } else {
+            alert(`Upgrade failed: ${error.message}`);
+          }
+        } else {
+          alert('An error occurred. Please try again.');
+        }
+        setIsLoading(false);
+      }
+    } else {
+      // Create new subscription
+      console.log('Starting checkout process...');
+      setIsLoading(true);
+      try {
+        await redirectToCheckout(priceId, planLower, billingPeriod);
+      } catch (error) {
+        console.error('Checkout error:', error);
+        if (error instanceof Error && (error.message.includes('Upgrade-Funktion') || error.message.includes('upgrade function'))) {
+          // Fallback: Try upgrade if checkout says upgrade needed
+          try {
+            const result = await upgradeSubscription(priceId, planLower, billingPeriod);
+            alert(`Upgrade successful! Your plan has been updated to ${plan}.`);
+            window.location.reload();
+          } catch (upgradeError) {
+            alert('An error occurred. Please try again.');
+          }
+        } else {
+          alert('An error occurred. Please try again.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   return (
@@ -124,15 +219,26 @@ export function Pricing() {
             <div
               key={index}
               className={`bg-white rounded-lg p-8 ${
-                plan.popular
+                plan.popular && currentPlan !== plan.name.toLowerCase()
                   ? 'ring-2 ring-vinted shadow-xl scale-105'
+                  : currentPlan === plan.name.toLowerCase()
+                  ? 'ring-2 ring-green-500 shadow-xl'
+                  : currentPlan === 'plus' && plan.name.toLowerCase() === 'pro'
+                  ? 'ring-2 ring-green-500 shadow-xl'
                   : 'shadow-md'
               } relative`}
             >
-              {plan.popular && (
+              {plan.popular && currentPlan !== plan.name.toLowerCase() && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <span className="bg-vinted text-white px-4 py-1 rounded-full text-sm font-medium">
                     Most Popular
+                  </span>
+                </div>
+              )}
+              {currentPlan === plan.name.toLowerCase() && (
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-medium">
+                    Your Current Plan
                   </span>
                 </div>
               )}
@@ -175,17 +281,121 @@ export function Pricing() {
                 ))}
               </ul>
 
-              <Button
-                variant={plan.popular ? 'primary' : 'outline'}
-                className="w-full"
-                onClick={() => handleCheckout(
-                  plan.priceId 
-                    ? (billingPeriod === 'monthly' ? plan.priceId.monthly : plan.priceId.yearly) || null
-                    : null
-                )}
-              >
-                {plan.cta}
-              </Button>
+              {/* Button oder Status-Anzeige */}
+              {(() => {
+                const planNameLower = plan.name.toLowerCase();
+                const isCurrentPlan = currentPlan === planNameLower;
+                const isUpgrade = currentPlan === 'plus' && planNameLower === 'pro';
+                
+                // Prüfe ob Downgrade (Pro → Plus)
+                const planHierarchy = { free: 0, plus: 1, pro: 2 };
+                const currentPlanLevel = currentPlan ? (planHierarchy[currentPlan as keyof typeof planHierarchy] ?? 0) : 0;
+                const targetPlanLevel = planHierarchy[planNameLower as keyof typeof planHierarchy] ?? 0;
+                const isDowngrade = currentPlanLevel > targetPlanLevel;
+                
+                if (isCurrentPlan) {
+                  // User hat bereits diesen Plan
+                  return (
+                    <div className="w-full">
+                      <Button
+                        variant="outline"
+                        className="w-full bg-green-50 border-green-500 text-green-700 hover:bg-green-100 cursor-default"
+                        disabled={true}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Already Active
+                      </Button>
+                    </div>
+                  );
+                }
+                
+                if (isDowngrade) {
+                  // Downgrade nicht erlaubt
+                  return (
+                    <div className="w-full">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                          <div className="text-xs text-gray-600">
+                            <p>Downgrade not possible. You can only upgrade to a higher plan.</p>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                        disabled={true}
+                      >
+                        Not Available
+                      </Button>
+                    </div>
+                  );
+                }
+                
+                if (isUpgrade) {
+                  // Upgrade von Plus auf Pro mit Erstattungshinweis
+                  return (
+                    <div className="w-full space-y-3">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-xs text-blue-800">
+                            <p className="font-semibold mb-1">Upgrade Bonus:</p>
+                            <p>You will receive an automatic refund for the unused portion of your Plus plan. The refund is calculated based on the days already used.</p>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="primary"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white border-green-600 mb-2"
+                        onClick={() => {
+                          const selectedPriceId = plan.priceId 
+                            ? (billingPeriod === 'monthly' ? plan.priceId.monthly : plan.priceId.yearly) || null
+                            : null;
+                          
+                          console.log('Button clicked:', { plan: plan.name, selectedPriceId, billingPeriod });
+                          handleCheckout(selectedPriceId, plan.name);
+                        }}
+                        disabled={!!(isLoading || (plan.priceId && isAuthenticated !== true))}
+                      >
+                        {isLoading ? 'Loading...' : `Upgrade to ${plan.name}`}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={async () => {
+                          try {
+                            await openCustomerPortal();
+                          } catch (error) {
+                            console.error('Error opening portal:', error);
+                          }
+                        }}
+                        disabled={isLoading}
+                      >
+                        Update Payment Method
+                      </Button>
+                    </div>
+                  );
+                }
+                
+                // Normale Checkout-Button
+                return (
+                  <Button
+                    variant={plan.popular ? 'primary' : 'outline'}
+                    className="w-full"
+                    onClick={() => {
+                      const selectedPriceId = plan.priceId 
+                        ? (billingPeriod === 'monthly' ? plan.priceId.monthly : plan.priceId.yearly) || null
+                        : null;
+                      console.log('Button clicked:', { plan: plan.name, selectedPriceId, billingPeriod });
+                      handleCheckout(selectedPriceId, plan.name);
+                    }}
+                    disabled={!!(isLoading || (plan.priceId && isAuthenticated !== true))}
+                  >
+                    {isLoading ? 'Loading...' : plan.cta}
+                  </Button>
+                );
+              })()}
             </div>
           ))}
         </div>

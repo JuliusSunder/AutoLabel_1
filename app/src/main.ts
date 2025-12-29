@@ -1,14 +1,39 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, crashReporter } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { autoUpdater } from 'electron-updater';
 import { getDatabase, closeDatabase } from './main/database/db';
 import { registerAllHandlers } from './main/ipc/handlers';
+import { logError, logInfo, logWarning, clearOldLogs, initializeLoggerExplicit } from './main/utils/logger';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
+// Initialize crash reporter
+crashReporter.start({
+  productName: 'AutoLabel',
+  companyName: 'AutoLabel',
+  submitURL: '', // No remote crash reporting - logs are stored locally
+  uploadToServer: false,
+});
+
+// Global error handlers
+process.on('uncaughtException', (error: Error) => {
+  console.error('[Main] Uncaught Exception:', error);
+  logError('Uncaught Exception in Main Process', error, {
+    type: 'uncaughtException',
+  });
+});
+
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  console.error('[Main] Unhandled Rejection at:', promise, 'reason:', reason);
+  logError('Unhandled Promise Rejection in Main Process', reason, {
+    type: 'unhandledRejection',
+    promise: String(promise),
+  });
+});
 
 // Configure auto-updater (only in production)
 if (app.isPackaged) {
@@ -51,16 +76,40 @@ if (app.isPackaged) {
 app.on('ready', () => {
   console.log('[Main] App ready, initializing...');
   
+  // Initialize logger first
+  initializeLoggerExplicit();
+  
+  logInfo('Application starting', { 
+    version: app.getVersion(),
+    isPackaged: app.isPackaged,
+    platform: process.platform,
+  });
+
+  // Clear old log files on startup
+  try {
+    clearOldLogs();
+  } catch (error) {
+    console.error('[Main] Failed to clear old logs:', error);
+  }
+  
   // Initialize database
   try {
     getDatabase();
     console.log('[Main] Database initialized successfully');
+    logInfo('Database initialized successfully');
   } catch (error) {
     console.error('[Main] Failed to initialize database:', error);
+    logError('Failed to initialize database', error);
   }
 
   // Register IPC handlers
-  registerAllHandlers();
+  try {
+    registerAllHandlers();
+    logInfo('IPC handlers registered successfully');
+  } catch (error) {
+    console.error('[Main] Failed to register IPC handlers:', error);
+    logError('Failed to register IPC handlers', error);
+  }
 
   // Create main window
   createWindow();
@@ -77,6 +126,7 @@ app.on('ready', () => {
 // Clean up on quit
 app.on('will-quit', () => {
   console.log('App quitting, closing database...');
+  logInfo('Application shutting down');
   closeDatabase();
 });
 
@@ -88,7 +138,29 @@ const createWindow = () => {
     title: 'AutoLabel',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
     },
+  });
+
+  // Handle renderer process crashes
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('[Main] Renderer process crashed:', details);
+    logError('Renderer process crashed', new Error('Renderer process gone'), {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
+  });
+
+  // Handle unresponsive renderer
+  mainWindow.on('unresponsive', () => {
+    console.warn('[Main] Window became unresponsive');
+    logWarning('Window became unresponsive');
+  });
+
+  mainWindow.on('responsive', () => {
+    console.log('[Main] Window became responsive again');
+    logInfo('Window became responsive again');
   });
 
   // and load the index.html of the app.
@@ -100,8 +172,12 @@ const createWindow = () => {
     );
   }
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // Open the DevTools only in development
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  logInfo('Main window created');
 };
 
 // Note: app.on('ready') is now at the top with initialization logic

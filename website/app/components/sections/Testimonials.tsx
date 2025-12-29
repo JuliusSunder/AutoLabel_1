@@ -1,5 +1,6 @@
 import { Container } from '../ui/Container';
 import { Quote, Star } from 'lucide-react';
+import { FeedbackForm } from './FeedbackForm';
 
 const testimonials = [
   {
@@ -123,6 +124,9 @@ export function Testimonials() {
             </div>
           </div>
         </div>
+
+        {/* Feedback Form */}
+        <FeedbackForm />
       </Container>
     </section>
   );
