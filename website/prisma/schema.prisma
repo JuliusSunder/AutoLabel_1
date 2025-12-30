@@ -16,10 +16,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  subscriptions      Subscription[]
-  licenses           License[]
-  usage              Usage[]
+  subscriptions       Subscription[]
+  licenses            License[]
+  usage               Usage[]
   passwordResetTokens PasswordResetToken[]
+  devices             Device[]
+  refreshTokens       RefreshToken[]
 }
 
 model Subscription {
@@ -61,6 +63,7 @@ model License {
 model Usage {
   id         String   @id @default(uuid())
   userId     String
+  deviceId   String   // Usage pro Device tracken
   plan       String   // free, plus, pro
   month      String   // Format: "YYYY-MM"
   labelsUsed Int      @default(0)
@@ -69,14 +72,45 @@ model Usage {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, month])
+  @@unique([userId, deviceId, month])
   @@index([userId])
+  @@index([deviceId])
   @@index([month])
 }
 
 model PasswordResetToken {
   id        String   @id @default(uuid())
   userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model Device {
+  id           String   @id @default(uuid())
+  userId       String
+  deviceId     String   @unique  // UUID von App
+  deviceName   String?  // Optional: "Laptop", "Desktop"
+  registeredAt DateTime @default(now())
+  lastSeen     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deviceId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  deviceId  String
   token     String   @unique
   expiresAt DateTime
   used      Boolean  @default(false)

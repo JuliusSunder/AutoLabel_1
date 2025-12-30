@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
-import { X, Printer, Clock, FileText, Lock } from 'lucide-react';
+import { X, Printer, Clock, FileText, Lock, User } from 'lucide-react';
 import type { PrinterInfo, FooterConfig } from '../../shared/types';
+import { AccountStatus } from './AccountStatus';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -39,8 +40,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const checkLicense = async () => {
     try {
-      const allowed = await api.license.canCustomFooter();
-      setCanCustomFooter(allowed);
+      const userInfo = await api.auth.getCachedUserInfo();
+      const plan = userInfo.subscription?.plan || 'free';
+      // Custom footer is allowed for Plus and Pro plans
+      setCanCustomFooter(plan !== 'free');
     } catch (err) {
       console.error('Failed to check custom footer permission:', err);
       setCanCustomFooter(false);
@@ -146,6 +149,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         <div className="settings-modal-content">
+          {/* Account Section */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <User size={20} />
+              <h3>Account</h3>
+            </div>
+            <AccountStatus />
+          </div>
+
           {/* Default Printer */}
           <div className="settings-section">
             <div className="settings-section-header">

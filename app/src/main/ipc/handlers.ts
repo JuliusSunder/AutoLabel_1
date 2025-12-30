@@ -10,7 +10,7 @@ import { registerAttachmentsHandlers } from './attachments';
 import { registerPrintHandlers } from './print';
 import { registerConfigHandlers } from './config';
 import { registerLoggingHandlers } from './logging';
-import { registerLicenseHandlers } from './license';
+import { registerAuthHandlers } from './auth';
 
 /**
  * Register all IPC handlers
@@ -20,7 +20,7 @@ export function registerAllHandlers(): void {
   console.log('[IPC] Registering all IPC handlers...');
 
   registerLoggingHandlers();
-  registerLicenseHandlers();
+  registerAuthHandlers();
   registerScanHandlers();
   registerSalesHandlers();
   registerLabelsHandlers();

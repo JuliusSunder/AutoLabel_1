@@ -13,6 +13,7 @@ export default defineConfig({
         'canvas',
         'pdfjs-dist',
         'pdfjs-dist/legacy/build/pdf.mjs',
+        // electron-store is bundled (no native dependencies)
       ],
     },
   },

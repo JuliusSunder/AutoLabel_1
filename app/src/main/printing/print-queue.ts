@@ -6,7 +6,6 @@
 import { printPdf, getDefaultPrinter, listPrinters, clearPrinterQueue } from './printer-manager';
 import * as printJobsRepo from '../database/repositories/print-jobs';
 import * as labelsRepo from '../database/repositories/labels';
-import { incrementUsage } from '../license/license-manager';
 import type { PrintJob } from '../../shared/types';
 import fs from 'node:fs';
 
@@ -135,10 +134,9 @@ export async function startPrintJob(
 
   console.log(`[Print Queue] Created print job: ${printJob.id}`);
 
-  // Increment usage counter when starting a NEW print job
-  // This ensures users are only charged when they actually print
-  incrementUsage(labels.length);
-  console.log(`[Print Queue] Usage incremented by ${labels.length} labels`);
+  // NOTE: Usage tracking is now handled server-side during label validation
+  // The server increments usage when validateLabelCreation is called in labels.ts
+  // No local usage increment needed here
 
   // Start printing in background
   processPrintJob(printJob.id).catch((error) => {

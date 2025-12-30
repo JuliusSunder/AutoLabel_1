@@ -33,17 +33,19 @@ export function PrintScreen() {
     loadJobs();
   }, []);
 
-  // Polling for live updates when there are active jobs
+  // Polling for live updates
+  // Poll more frequently when there are active jobs, less frequently otherwise
   useEffect(() => {
     const hasActiveJobs = jobs.some(
       (j) => j.status === 'printing' || j.status === 'pending'
     );
 
-    if (!hasActiveJobs) return;
+    // Poll every 3 seconds if active jobs, every 10 seconds otherwise
+    const pollInterval = hasActiveJobs ? 3000 : 10000;
 
     const interval = setInterval(() => {
       loadJobs();
-    }, 3000);
+    }, pollInterval);
 
     return () => clearInterval(interval);
   }, [jobs]);

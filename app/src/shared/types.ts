@@ -182,42 +182,63 @@ export interface AutoLabelAPI {
     getDirectory: () => Promise<{ success: boolean; directory?: string; error?: string }>;
     getFiles: () => Promise<{ success: boolean; files?: string[]; error?: string }>;
   };
-  license: {
-    get: () => Promise<LicenseInfo>;
-    validate: (licenseKey: string) => Promise<{ success: boolean; error?: string; license?: LicenseInfo }>;
-    remove: () => Promise<{ success: boolean }>;
-    usage: () => Promise<UsageInfo>;
-    canCreateLabels: (count?: number) => Promise<{ allowed: boolean; reason?: string }>;
-    canBatchPrint: () => Promise<boolean>;
-    canCustomFooter: () => Promise<boolean>;
-    getLimits: () => Promise<LicenseLimits>;
-    resetUsage: () => Promise<{ success: boolean }>;
+  auth: {
+    login: (email: string, password: string) => Promise<AuthResult>;
+    logout: () => Promise<{ success: boolean }>;
+    getSession: () => Promise<SessionInfo | null>;
+    refreshToken: () => Promise<{ success: boolean }>;
+    validateLabelCreation: (count: number) => Promise<ValidationResult>;
+    getDeviceId: () => Promise<string>;
+    isAuthenticated: () => Promise<boolean>;
+    getCachedUserInfo: () => Promise<{
+      user: { id: string; email: string; name: string | null } | null;
+      subscription: { plan: 'free' | 'plus' | 'pro'; status: string; expiresAt: string | null } | null;
+    }>;
   };
 }
 
 // ============================================================================
-// License & Usage Types
+// Auth & User Types
 // ============================================================================
 
-export interface LicenseInfo {
-  plan: 'free' | 'plus' | 'pro';
-  licenseKey: string | null;
-  expiresAt: string | null;
-  validatedAt: string;
-  isValid: boolean;
+export interface AuthResult {
+  success: boolean;
+  error?: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+  subscription?: {
+    plan: 'free' | 'plus' | 'pro';
+    status: string;
+    expiresAt: string | null;
+  };
 }
 
-export interface UsageInfo {
-  labelsUsed: number;
-  month: string; // Format: "YYYY-MM"
-  limit: number; // -1 = unlimited
-  remaining: number; // -1 = unlimited
+export interface SessionInfo {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+  subscription: {
+    plan: 'free' | 'plus' | 'pro';
+    status: string;
+    expiresAt: string | null;
+  };
+  device: {
+    id: string;
+    registeredAt: string;
+    lastSeen: string;
+  } | null;
 }
 
-export interface LicenseLimits {
-  labelsPerMonth: number; // -1 = unlimited
-  batchPrinting: boolean;
-  customFooter: boolean;
+export interface ValidationResult {
+  allowed: boolean;
+  reason?: string;
+  remaining?: number;
+  limit?: number;
 }
 
 // ============================================================================

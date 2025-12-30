@@ -269,7 +269,9 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
 
     try {
       // Check if custom footer is allowed
-      const canCustomFooter = await api.license.canCustomFooter();
+      const userInfo = await api.auth.getCachedUserInfo();
+      const plan = userInfo.subscription?.plan || 'free';
+      const canCustomFooter = plan !== 'free';
       
       // Get default footer config from localStorage (only if allowed)
       let defaultConfig = undefined;

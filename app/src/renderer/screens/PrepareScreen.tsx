@@ -39,8 +39,10 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
   useEffect(() => {
     const checkLicense = async () => {
       try {
-        const allowed = await api.license.canCustomFooter();
-        setCanCustomFooter(allowed);
+        const userInfo = await api.auth.getCachedUserInfo();
+        const plan = userInfo.subscription?.plan || 'free';
+        // Custom footer is allowed for Plus and Pro plans
+        setCanCustomFooter(plan !== 'free');
       } catch (err) {
         console.error('Failed to check custom footer permission:', err);
         setCanCustomFooter(false);

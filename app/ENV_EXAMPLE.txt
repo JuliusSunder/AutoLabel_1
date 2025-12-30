@@ -22,6 +22,16 @@ GITHUB_TOKEN=your-github-personal-access-token
 
 
 # ======================
+# Website URL (Required)
+# ======================
+# URL der AutoLabel Website (für Login, Registrierung, Pricing)
+# Development: http://localhost:3000
+# Production: https://autolabel.com (oder deine Domain)
+WEBSITE_URL=http://localhost:3000
+VITE_WEBSITE_URL=http://localhost:3000
+
+
+# ======================
 # Development (Optional)
 # ======================
 # Electron Developer Tools

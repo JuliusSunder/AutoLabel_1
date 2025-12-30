@@ -55,16 +55,15 @@ const autolabelAPI: AutoLabelAPI = {
     getDirectory: () => ipcRenderer.invoke('log:getDirectory'),
     getFiles: () => ipcRenderer.invoke('log:getFiles'),
   },
-  license: {
-    get: () => ipcRenderer.invoke('license:get'),
-    validate: (licenseKey) => ipcRenderer.invoke('license:validate', licenseKey),
-    remove: () => ipcRenderer.invoke('license:remove'),
-    usage: () => ipcRenderer.invoke('license:usage'),
-    canCreateLabels: (count) => ipcRenderer.invoke('license:canCreateLabels', count),
-    canBatchPrint: () => ipcRenderer.invoke('license:canBatchPrint'),
-    canCustomFooter: () => ipcRenderer.invoke('license:canCustomFooter'),
-    getLimits: () => ipcRenderer.invoke('license:getLimits'),
-    resetUsage: () => ipcRenderer.invoke('license:resetUsage'),
+  auth: {
+    login: (email, password) => ipcRenderer.invoke('auth:login', email, password),
+    logout: () => ipcRenderer.invoke('auth:logout'),
+    getSession: () => ipcRenderer.invoke('auth:getSession'),
+    refreshToken: () => ipcRenderer.invoke('auth:refreshToken'),
+    validateLabelCreation: (count) => ipcRenderer.invoke('auth:validateLabelCreation', count),
+    getDeviceId: () => ipcRenderer.invoke('auth:getDeviceId'),
+    isAuthenticated: () => ipcRenderer.invoke('auth:isAuthenticated'),
+    getCachedUserInfo: () => ipcRenderer.invoke('auth:getCachedUserInfo'),
   },
 };
 
