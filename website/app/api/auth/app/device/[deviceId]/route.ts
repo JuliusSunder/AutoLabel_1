@@ -10,7 +10,7 @@ import { validateBearerToken, getUserFromToken } from '@/app/lib/auth-middleware
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { deviceId: string } }
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {
     // Validate token
@@ -31,7 +31,8 @@ export async function DELETE(
       );
     }
 
-    const { deviceId } = params;
+    // Await params (Next.js 16+)
+    const { deviceId } = await params;
 
     // Find device
     const device = await prisma.device.findUnique({

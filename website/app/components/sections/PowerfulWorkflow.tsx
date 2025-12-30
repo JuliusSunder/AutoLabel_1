@@ -60,12 +60,14 @@ const features = [
   {
     icon: Layers,
     title: 'Batch Processing',
-    description: 'Handle dozens of orders in minutes, not hours.',
+    description: 'Handle dozens of orders in <strong class="text-white font-bold">seconds</strong>, not hours.',
+    hasBatchProcessing: true,
   },
   {
     icon: List,
     title: 'Smart Print Queue',
     description: 'Track status. Never lose which labels are printed.',
+    hasPrintQueue: true,
   },
 ];
 
@@ -94,7 +96,16 @@ export function PowerfulWorkflow() {
 
         {/* Workflow Steps - Single Card */}
         <div className="mx-auto mb-32 max-w-5xl">
-          <div className="p-8 rounded-3xl border backdrop-blur-sm bg-white/5 border-white/10 md:p-12">
+          <div className="relative p-8 rounded-3xl border backdrop-blur-sm bg-white/5 border-white/10 md:p-12">
+            {/* "In one click!" Badge */}
+            <div className="absolute -top-3 left-8 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-accent to-accent-dark text-white text-sm font-bold shadow-lg border-2 border-accent-light/30">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              </span>
+              In one click!
+            </div>
+            
             <div className="grid grid-cols-1 gap-0 md:grid-cols-2 lg:grid-cols-4">
               {workflowSteps.map((step, index) => {
                 const Icon = step.icon;
@@ -158,7 +169,7 @@ export function PowerfulWorkflow() {
                 className="overflow-hidden rounded-2xl border backdrop-blur-sm transition-all duration-300 group bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10"
               >
                 {/* Image Area */}
-                <div className="flex relative justify-center items-center p-8 w-full bg-gradient-to-br aspect-[4/3] from-white/10 to-white/5">
+                <div className="flex relative justify-center items-center p-8 w-full bg-gradient-to-br aspect-[4/3] from-white/10 to-white/5 overflow-hidden">
                     {feature.hasCarrierLogos ? (
                       // Carrier Logos Display
                       <div className="flex flex-wrap gap-6 justify-center items-center max-w-2xl mx-auto">
@@ -267,6 +278,38 @@ export function PowerfulWorkflow() {
                           </div>
                         ))}
                       </div>
+                    ) : feature.hasBatchProcessing ? (
+                      // Batch Processing Image
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="relative w-full h-full rounded-lg overflow-hidden">
+                          {!loadedImages.has('/images/cards/badgeprint.JPG') && (
+                            <div className="absolute inset-0 animate-pulse bg-gray-700/50 rounded-lg" />
+                          )}
+                          <Image
+                            src="/images/cards/badgeprint.JPG"
+                            alt="Batch Processing Labels"
+                            fill
+                            className="object-cover rounded-lg"
+                            onLoad={() => handleImageLoad('/images/cards/badgeprint.JPG')}
+                          />
+                        </div>
+                      </div>
+                    ) : feature.hasPrintQueue ? (
+                      // Print Queue Screenshot
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="relative w-full h-full rounded-lg overflow-hidden">
+                          {!loadedImages.has('/images/cards/printqueue.png') && (
+                            <div className="absolute inset-0 animate-pulse bg-gray-700/50 rounded-lg" />
+                          )}
+                          <Image
+                            src="/images/cards/printqueue.png"
+                            alt="Smart Print Queue Interface"
+                            fill
+                            className="object-cover rounded-lg"
+                            onLoad={() => handleImageLoad('/images/cards/printqueue.png')}
+                          />
+                        </div>
+                      </div>
                     ) : (
                       // Default Icon Placeholder
                       <>
@@ -290,9 +333,10 @@ export function PowerfulWorkflow() {
                         {feature.title}
                       </h3>
                     </div>
-                    <p className="text-lg leading-relaxed text-gray-400">
-                      {feature.description}
-                    </p>
+                    <p 
+                      className="text-lg leading-relaxed text-gray-400"
+                      dangerouslySetInnerHTML={{ __html: feature.description }}
+                    />
                   </div>
               </div>
             );
