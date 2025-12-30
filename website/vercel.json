@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma migrate deploy && prisma generate && next build",
+  "buildCommand": "prisma migrate resolve --rolled-back 20251229110155_make_stripe_customer_id_nullable && prisma migrate deploy && prisma generate && next build",
   "installCommand": "npm install && npx prisma generate"
 }
 
