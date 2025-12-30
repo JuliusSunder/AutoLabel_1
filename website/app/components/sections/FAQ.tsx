@@ -27,11 +27,11 @@ const faqs = [
   },
   {
     question: 'Can I connect multiple email accounts?',
-    answer: 'The Pro plan supports multiple email accounts. This is perfect if you sell on multiple platforms or use different email addresses for different marketplaces. The Free and Plus plans support one email account.',
+    answer: 'All plans support multiple email accounts. This is perfect if you sell on multiple platforms or use different email addresses for different marketplaces.',
   },
   {
     question: 'Which platforms and carriers are supported?',
-    answer: 'AutoLabel automatically detects labels from all major carriers including DHL, Hermes, DPD, GLS, and UPS. It works with labels from Vinted, eBay, Kleiderkreisel, and any other platform that sends shipping labels via email.',
+    answer: 'AutoLabel automatically detects labels from major carriers including DHL, Hermes, DPD, GLS, and UPS. Currently, it works with labels from Vinted, with support for additional platforms coming soon.',
   },
 ];
 

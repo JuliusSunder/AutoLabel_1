@@ -20,6 +20,7 @@ export enum ErrorType {
   INVALID_PDF = 'INVALID_PDF',
   INVALID_CONFIG = 'INVALID_CONFIG',
   PERMISSION_DENIED = 'PERMISSION_DENIED',
+  USAGE_LIMIT_EXCEEDED = 'USAGE_LIMIT_EXCEEDED',
   UNKNOWN = 'UNKNOWN',
 }
 
@@ -40,6 +41,7 @@ const ERROR_MESSAGES: Record<ErrorType, string> = {
   [ErrorType.INVALID_PDF]: 'Die PDF-Datei ist ungültig oder beschädigt.',
   [ErrorType.INVALID_CONFIG]: 'Die Konfiguration ist ungültig. Bitte überprüfen Sie Ihre Einstellungen.',
   [ErrorType.PERMISSION_DENIED]: 'Zugriff verweigert. Bitte überprüfen Sie die Berechtigungen.',
+  [ErrorType.USAGE_LIMIT_EXCEEDED]: 'Monatslimit erreicht. Bitte upgraden Sie Ihren Plan für mehr Labels.',
   [ErrorType.UNKNOWN]: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
 };
 
@@ -53,6 +55,16 @@ function detectErrorType(error: Error | unknown): ErrorType {
 
   const message = error.message.toLowerCase();
   const name = error.name.toLowerCase();
+
+  // Usage limit errors - check first as they have specific messages
+  if (
+    message.includes('monatslimit') ||
+    message.includes('limit erreicht') ||
+    message.includes('labels verwendet') ||
+    message.includes('upgraden sie')
+  ) {
+    return ErrorType.USAGE_LIMIT_EXCEEDED;
+  }
 
   // Email-related errors
   if (message.includes('econnrefused') || message.includes('enotfound') || message.includes('etimedout')) {
@@ -132,9 +144,29 @@ function detectErrorType(error: Error | unknown): ErrorType {
 }
 
 /**
+ * Check if error message is already user-friendly
+ * User-friendly messages typically contain specific information like usage counts
+ */
+function isUserFriendlyMessage(message: string): boolean {
+  const lowerMessage = message.toLowerCase();
+  
+  // Usage limit messages with specific counts are already user-friendly
+  if (lowerMessage.includes('monatslimit erreicht') && lowerMessage.includes('von')) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Get user-friendly error message from error object
  */
 export function getUserFriendlyError(error: Error | unknown, customMessage?: string): string {
+  // Check if the error message is already user-friendly
+  if (error instanceof Error && isUserFriendlyMessage(error.message)) {
+    return error.message;
+  }
+
   const errorType = detectErrorType(error);
   const baseMessage = ERROR_MESSAGES[errorType];
 
@@ -189,6 +221,11 @@ export function isRecoverableError(error: Error | unknown): boolean {
     ErrorType.PRINTER_ERROR,
   ];
 
+  // Usage limit errors are not recoverable by retry - user needs to upgrade
+  if (errorType === ErrorType.USAGE_LIMIT_EXCEEDED) {
+    return false;
+  }
+
   return recoverableTypes.includes(errorType);
 }
 
@@ -212,6 +249,7 @@ export function getSuggestedAction(error: Error | unknown): string {
     [ErrorType.INVALID_PDF]: 'Versuchen Sie, das Label erneut zu generieren.',
     [ErrorType.INVALID_CONFIG]: 'Überprüfen Sie Ihre Einstellungen in den Einstellungen.',
     [ErrorType.PERMISSION_DENIED]: 'Starten Sie die Anwendung mit Administratorrechten.',
+    [ErrorType.USAGE_LIMIT_EXCEEDED]: 'Upgraden Sie Ihren Plan auf Plus oder Pro für mehr Labels pro Monat.',
     [ErrorType.UNKNOWN]: 'Versuchen Sie es erneut. Wenn das Problem weiterhin besteht, kontaktieren Sie den Support.',
   };
 
