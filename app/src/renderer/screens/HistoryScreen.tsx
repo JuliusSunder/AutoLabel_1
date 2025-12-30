@@ -268,17 +268,23 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     setError(null);
 
     try {
-      // Get default footer config from localStorage
-      const savedFooterConfig = localStorage.getItem('defaultFooterConfig');
-      const defaultConfig = savedFooterConfig 
-        ? JSON.parse(savedFooterConfig) 
-        : {
-            includeProductNumber: true,
-            includeItemTitle: false,
-            includeDate: true,
-          };
+      // Check if custom footer is allowed
+      const canCustomFooter = await api.license.canCustomFooter();
+      
+      // Get default footer config from localStorage (only if allowed)
+      let defaultConfig = undefined;
+      if (canCustomFooter) {
+        const savedFooterConfig = localStorage.getItem('defaultFooterConfig');
+        defaultConfig = savedFooterConfig 
+          ? JSON.parse(savedFooterConfig) 
+          : {
+              includeProductNumber: true,
+              includeItemTitle: false,
+              includeDate: true,
+            };
+      }
 
-      // Prepare labels with default config
+      // Prepare labels with default config (or undefined if not allowed)
       const result = await api.labels.prepare({
         saleIds: Array.from(selectedIds),
         footerConfig: defaultConfig,

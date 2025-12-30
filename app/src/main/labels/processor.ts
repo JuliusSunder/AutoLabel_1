@@ -41,7 +41,7 @@ function getPreparedDir(): string {
  */
 export async function prepareLabels(
   saleIds: string[],
-  footerConfig: FooterConfig
+  footerConfig?: FooterConfig
 ): Promise<PreparedLabel[]> {
   console.log(`[Processor] Preparing labels for ${saleIds.length} sales`);
 
@@ -82,22 +82,34 @@ export async function prepareLabels(
           saleId: sale.id,
         });
 
-        // Step 2: Add footer
+        // Step 2: Add footer (only if footerConfig is provided)
         // Keep format as-is for best quality
         const normalizedExt = path.extname(normalized.outputPath).toLowerCase();
         const finalFilename = `label_${Date.now()}_${saleId}${normalizedExt}`;
         const finalPath = path.join(getPreparedDir(), finalFilename);
 
-        await addFooter(
-          normalized.outputPath,
-          finalPath,
-          sale,
-          footerConfig
-        );
+        if (footerConfig) {
+          // Add footer if config is provided
+          await addFooter(
+            normalized.outputPath,
+            finalPath,
+            sale,
+            footerConfig
+          );
 
-        // Clean up temp file
-        if (fs.existsSync(normalized.outputPath)) {
-          fs.unlinkSync(normalized.outputPath);
+          // Clean up temp file
+          if (fs.existsSync(normalized.outputPath)) {
+            fs.unlinkSync(normalized.outputPath);
+          }
+        } else {
+          // No footer - just copy/move the normalized file
+          console.log('[Processor] No footer config, using label without footer');
+          fs.copyFileSync(normalized.outputPath, finalPath);
+          
+          // Clean up temp file
+          if (fs.existsSync(normalized.outputPath)) {
+            fs.unlinkSync(normalized.outputPath);
+          }
         }
 
         // Step 3: Save to database
@@ -107,8 +119,8 @@ export async function prepareLabels(
           outputPath: finalPath,
           sizeMm: { width: TARGET_SIZE_MM.width, height: TARGET_SIZE_MM.height },
           dpi: TARGET_DPI,
-          footerApplied: true,
-          footerConfig,
+          footerApplied: !!footerConfig, // Only true if footer was actually added
+          footerConfig: footerConfig || undefined,
         });
 
         preparedLabels.push(preparedLabel);

@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
-import { AlertCircle, Printer } from 'lucide-react';
+import { AlertCircle, Printer, Info } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -239,6 +239,14 @@ export function PrintScreen() {
 
       <div className="card print-queue">
         <h3>Print Jobs</h3>
+        
+        <div className="print-info-box">
+          <Info size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <p>
+            <strong>Usage Info:</strong> Your label count is deducted when you start printing. 
+            Completed or failed jobs can be retried for free without additional charges.
+          </p>
+        </div>
 
         {loadingJobs && <p>Loading print jobs...</p>}
 
@@ -402,15 +410,27 @@ export function PrintScreen() {
                       </>
                     )}
                     {job.status === 'completed' && (
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(job.id)}
-                        disabled={actionLoading?.jobId === job.id}
-                      >
-                        {actionLoading?.jobId === job.id && actionLoading?.action === 'delete' 
-                          ? 'Deleting...' 
-                          : '🗑️ Delete'}
-                      </button>
+                      <>
+                        <button
+                          className="btn btn-success"
+                          onClick={() => handleRetry(job.id)}
+                          disabled={actionLoading?.jobId === job.id}
+                          title="Print again for free"
+                        >
+                          {actionLoading?.jobId === job.id && actionLoading?.action === 'retry' 
+                            ? 'Printing...' 
+                            : '🔄 Print Again'}
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => handleDelete(job.id)}
+                          disabled={actionLoading?.jobId === job.id}
+                        >
+                          {actionLoading?.jobId === job.id && actionLoading?.action === 'delete' 
+                            ? 'Deleting...' 
+                            : '🗑️ Delete'}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

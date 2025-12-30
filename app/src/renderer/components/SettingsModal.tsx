@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
-import { X, Printer, Clock, FileText } from 'lucide-react';
+import { X, Printer, Clock, FileText, Lock } from 'lucide-react';
 import type { PrinterInfo, FooterConfig } from '../../shared/types';
 import './SettingsModal.css';
 
@@ -26,14 +26,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     includeDate: true,
   });
   const [loadingPrinters, setLoadingPrinters] = useState(false);
+  const [canCustomFooter, setCanCustomFooter] = useState<boolean>(true); // License check
 
   // Load settings from localStorage on mount
   useEffect(() => {
     if (isOpen) {
       loadPrinters();
       loadSettings();
+      checkLicense();
     }
   }, [isOpen]);
+
+  const checkLicense = async () => {
+    try {
+      const allowed = await api.license.canCustomFooter();
+      setCanCustomFooter(allowed);
+    } catch (err) {
+      console.error('Failed to check custom footer permission:', err);
+      setCanCustomFooter(false);
+    }
+  };
 
   const loadPrinters = async () => {
     setLoadingPrinters(true);
@@ -208,38 +220,59 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <FileText size={20} />
               <h3>Default Footer Settings</h3>
             </div>
-            <p className="settings-section-description">
-              Choose which fields to include in labels by default
-            </p>
-            <div className="settings-footer-options">
-              <label className="settings-toggle-label">
-                <input
-                  type="checkbox"
-                  checked={defaultFooterConfig.includeProductNumber}
-                  onChange={(e) => handleFooterConfigChange('includeProductNumber', e.target.checked)}
-                  aria-label="Include product number"
-                />
-                <span>Product Number</span>
-              </label>
-              <label className="settings-toggle-label">
-                <input
-                  type="checkbox"
-                  checked={defaultFooterConfig.includeItemTitle}
-                  onChange={(e) => handleFooterConfigChange('includeItemTitle', e.target.checked)}
-                  aria-label="Include item title"
-                />
-                <span>Item Title</span>
-              </label>
-              <label className="settings-toggle-label">
-                <input
-                  type="checkbox"
-                  checked={defaultFooterConfig.includeDate}
-                  onChange={(e) => handleFooterConfigChange('includeDate', e.target.checked)}
-                  aria-label="Include date"
-                />
-                <span>Date</span>
-              </label>
-            </div>
+            
+            {canCustomFooter ? (
+              <>
+                <p className="settings-section-description">
+                  Choose which fields to include in labels by default
+                </p>
+                <div className="settings-footer-options">
+                  <label className="settings-toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={defaultFooterConfig.includeProductNumber}
+                      onChange={(e) => handleFooterConfigChange('includeProductNumber', e.target.checked)}
+                      aria-label="Include product number"
+                    />
+                    <span>Product Number</span>
+                  </label>
+                  <label className="settings-toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={defaultFooterConfig.includeItemTitle}
+                      onChange={(e) => handleFooterConfigChange('includeItemTitle', e.target.checked)}
+                      aria-label="Include item title"
+                    />
+                    <span>Item Title</span>
+                  </label>
+                  <label className="settings-toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={defaultFooterConfig.includeDate}
+                      onChange={(e) => handleFooterConfigChange('includeDate', e.target.checked)}
+                      aria-label="Include date"
+                    />
+                    <span>Date</span>
+                  </label>
+                </div>
+              </>
+            ) : (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                padding: '24px',
+                opacity: 0.6 
+              }}>
+                <Lock size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                <p style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', textAlign: 'center' }}>
+                  Custom Footer Locked
+                </p>
+                <p style={{ fontSize: '13px', opacity: 0.8, textAlign: 'center' }}>
+                  Upgrade your plan to unlock this feature
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

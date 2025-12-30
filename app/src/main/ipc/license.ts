@@ -187,8 +187,8 @@ export function registerLicenseHandlers(): void {
       // Return free plan limits as fallback
       return {
         labelsPerMonth: 10,
-        batchPrinting: false,
-        customFooter: false,
+        batchPrinting: true, // ✓ Batch Printing available in Free Plan
+        customFooter: false, // ✗ Custom Footer locked in Free Plan
       };
     }
   });

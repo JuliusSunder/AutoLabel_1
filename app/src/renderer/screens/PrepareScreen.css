@@ -385,3 +385,17 @@
   margin-bottom: 0.25rem;
 }
 
+/* Footer Locked State */
+.prepare-footer-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px dashed #ced4da;
+  border-radius: 8px;
+  text-align: center;
+  min-height: 160px;
+}
+

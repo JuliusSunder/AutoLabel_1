@@ -116,6 +116,28 @@
   margin-bottom: 1rem;
 }
 
+.print-info-box {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: linear-gradient(135deg, #e3f2fd 0%, #f0f7ff 100%);
+  border-left: 3px solid #2196f3;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.print-info-box p {
+  margin: 0;
+  color: #1565c0;
+}
+
+.print-info-box strong {
+  color: #0d47a1;
+  font-weight: 600;
+}
+
 .print-info {
   background: #e8f4f8;
   border-left: 4px solid #3498db;

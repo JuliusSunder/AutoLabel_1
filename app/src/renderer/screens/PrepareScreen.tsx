@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
 import { toast } from '../hooks/useToast';
-import { Tag } from 'lucide-react';
+import { Tag, Lock } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 import type { FooterConfig, Sale, PrinterInfo } from '../../shared/types';
 import { CarrierBadge, PlatformBadge } from '../../components/ui/carrier-badge';
@@ -33,6 +33,21 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
   const [preparedThumbnails, setPreparedThumbnails] = useState<Map<string, string>>(new Map());
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string | undefined>();
+  const [canCustomFooter, setCanCustomFooter] = useState<boolean>(true); // License check
+
+  // Check license on mount
+  useEffect(() => {
+    const checkLicense = async () => {
+      try {
+        const allowed = await api.license.canCustomFooter();
+        setCanCustomFooter(allowed);
+      } catch (err) {
+        console.error('Failed to check custom footer permission:', err);
+        setCanCustomFooter(false);
+      }
+    };
+    checkLicense();
+  }, []);
 
   // Load sale details when selectedSaleIds change
   useEffect(() => {
@@ -54,19 +69,21 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
     if (selectedSaleIds.length > 0) {
       loadSales();
       
-      // Load default footer config from localStorage
-      const savedFooterConfig = localStorage.getItem('defaultFooterConfig');
-      if (savedFooterConfig) {
-        try {
-          setFooterConfig(JSON.parse(savedFooterConfig));
-        } catch (err) {
-          console.error('Failed to parse footer config:', err);
+      // Load default footer config from localStorage (only if allowed)
+      if (canCustomFooter) {
+        const savedFooterConfig = localStorage.getItem('defaultFooterConfig');
+        if (savedFooterConfig) {
+          try {
+            setFooterConfig(JSON.parse(savedFooterConfig));
+          } catch (err) {
+            console.error('Failed to parse footer config:', err);
+          }
         }
       }
     } else {
       setSales([]);
     }
-  }, [selectedSaleIds]);
+  }, [selectedSaleIds, canCustomFooter]);
 
   // Load thumbnails for selected sales
   useEffect(() => {
@@ -257,38 +274,56 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
 
       <div className="card prepare-footer-config">
         <h3>Footer Configuration</h3>
-        <p className="prepare-footer-hint">
-          Select which fields to include in the label footer:
-        </p>
+        
+        {canCustomFooter ? (
+          <>
+            <p className="prepare-footer-hint">
+              Select which fields to include in the label footer:
+            </p>
 
-        <div className="prepare-checkboxes">
-          <label className="prepare-checkbox-label">
-            <input
-              type="checkbox"
-              checked={footerConfig.includeProductNumber}
-              onChange={() => handleToggleField('includeProductNumber')}
-            />
-            <span>Product Number</span>
-          </label>
+            <div className="prepare-checkboxes">
+              <label className="prepare-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={footerConfig.includeProductNumber}
+                  onChange={() => handleToggleField('includeProductNumber')}
+                />
+                <span>Product Number</span>
+              </label>
 
-          <label className="prepare-checkbox-label">
-            <input
-              type="checkbox"
-              checked={footerConfig.includeItemTitle}
-              onChange={() => handleToggleField('includeItemTitle')}
-            />
-            <span>Item Title</span>
-          </label>
+              <label className="prepare-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={footerConfig.includeItemTitle}
+                  onChange={() => handleToggleField('includeItemTitle')}
+                />
+                <span>Item Title</span>
+              </label>
 
-          <label className="prepare-checkbox-label">
-            <input
-              type="checkbox"
-              checked={footerConfig.includeDate}
-              onChange={() => handleToggleField('includeDate')}
-            />
-            <span>Date</span>
-          </label>
-        </div>
+              <label className="prepare-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={footerConfig.includeDate}
+                  onChange={() => handleToggleField('includeDate')}
+                />
+                <span>Date</span>
+              </label>
+            </div>
+          </>
+        ) : (
+          <div className="prepare-footer-locked">
+            <Lock size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
+            <p style={{ fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
+              Custom Footer Locked
+            </p>
+            <p style={{ fontSize: '14px', opacity: 0.7, marginBottom: '16px' }}>
+              Upgrade your plan to unlock custom footer configuration
+            </p>
+            <p style={{ fontSize: '13px', opacity: 0.6 }}>
+              Labels will be prepared without footer text
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="card prepare-actions">

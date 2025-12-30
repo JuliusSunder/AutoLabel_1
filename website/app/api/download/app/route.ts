@@ -70,7 +70,10 @@ export async function GET(req: NextRequest) {
     
     if (!downloadUrl || downloadUrl.includes("your-username") || downloadUrl.includes("github.com/your-username")) {
       // Use direct public file path (works on Vercel)
-      const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+      // Get the base URL from the request to ensure correct domain
+      const protocol = req.headers.get("x-forwarded-proto") || "https";
+      const host = req.headers.get("host") || "autolabel.app";
+      const baseUrl = `${protocol}://${host}`;
       downloadUrl = `${baseUrl}/downloads/AutoLabel-Setup.exe`;
     }
 

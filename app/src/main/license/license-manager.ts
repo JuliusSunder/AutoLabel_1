@@ -12,8 +12,8 @@ import { logError, logInfo, logDebug } from '../utils/logger';
 export const USAGE_LIMITS = {
   free: {
     labelsPerMonth: 10,
-    batchPrinting: false,
-    customFooter: false,
+    batchPrinting: true, // ✓ Batch Printing available in Free Plan
+    customFooter: false, // ✗ Custom Footer locked in Free Plan
   },
   plus: {
     labelsPerMonth: 60,

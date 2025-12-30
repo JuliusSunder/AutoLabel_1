@@ -4,13 +4,12 @@
  */
 
 import { ipcMain } from 'electron';
-import fs from 'fs';
 import { prepareLabels } from '../labels/processor';
 import { generatePDFThumbnail } from '../labels/pdf-thumbnail';
 import type { PreparedLabel, FooterConfig } from '../../shared/types';
 import { logError, logInfo, logDebug } from '../utils/logger';
 import { getUserFriendlyError } from '../utils/error-messages';
-import { canCreateLabels, incrementUsage, canCustomFooter } from '../license/license-manager';
+import { canCreateLabels, canCustomFooter } from '../license/license-manager';
 
 /**
  * Register labels IPC handlers
@@ -30,11 +29,14 @@ export function registerLabelsHandlers(): void {
       });
 
       try {
-        // Check if custom footer is allowed
+        // Check if custom footer is allowed - if not, ignore footer config
+        let footerConfig = params.footerConfig;
         if (params.footerConfig && !canCustomFooter()) {
-          const error = new Error('Custom Footer ist nur in Premium-Plänen verfügbar. Bitte upgraden Sie Ihren Plan.');
-          logError('Custom footer not allowed', error);
-          throw error;
+          console.log('[IPC] Custom footer not allowed in current plan, ignoring footer config');
+          logInfo('Custom footer not allowed, preparing labels without footer', {
+            plan: 'free',
+          });
+          footerConfig = undefined; // Ignore footer config for free plan
         }
 
         // Check usage limits before creating labels
@@ -50,14 +52,14 @@ export function registerLabelsHandlers(): void {
           throw error;
         }
 
-        // Prepare labels
+        // Prepare labels (with or without footer depending on plan)
         const preparedLabels = await prepareLabels(
           params.saleIds,
-          params.footerConfig
+          footerConfig
         );
         
-        // Increment usage counter after successful preparation
-        incrementUsage(preparedLabels.length);
+        // Note: Usage counter is NOT incremented here
+        // It will be incremented when the labels are actually printed
         
         console.log(`[IPC] Prepared ${preparedLabels.length} labels`);
         logInfo('Label preparation completed', { 
