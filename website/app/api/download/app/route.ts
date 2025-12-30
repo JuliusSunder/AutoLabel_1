@@ -69,9 +69,9 @@ export async function GET(req: NextRequest) {
     let downloadUrl = process.env.APP_DOWNLOAD_URL;
     
     if (!downloadUrl || downloadUrl.includes("your-username") || downloadUrl.includes("github.com/your-username")) {
-      // Use direct file download endpoint
+      // Use direct public file path (works on Vercel)
       const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-      downloadUrl = `${baseUrl}/api/download/file`;
+      downloadUrl = `${baseUrl}/downloads/AutoLabel-Setup.exe`;
     }
 
     // Return download URL
