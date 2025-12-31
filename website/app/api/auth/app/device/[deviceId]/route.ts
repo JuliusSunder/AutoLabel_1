@@ -34,9 +34,13 @@ export async function DELETE(
     // Await params (Next.js 16+)
     const { deviceId } = await params;
 
-    // Find device
-    const device = await prisma.device.findUnique({
-      where: { deviceId },
+    // Find device - use findFirst since deviceId alone is not unique
+    // Only the combination userId + deviceId is unique
+    const device = await prisma.device.findFirst({
+      where: {
+        userId: user.id,
+        deviceId,
+      },
     });
 
     if (!device) {
@@ -46,17 +50,14 @@ export async function DELETE(
       );
     }
 
-    // Verify ownership
-    if (device.userId !== user.id) {
-      return NextResponse.json(
-        { error: 'Keine Berechtigung für dieses Gerät' },
-        { status: 403 }
-      );
-    }
-
-    // Delete device
+    // Delete device - use the compound unique key
     await prisma.device.delete({
-      where: { deviceId },
+      where: {
+        userId_deviceId: {
+          userId: user.id,
+          deviceId,
+        },
+      },
     });
 
     // Also delete associated refresh tokens
