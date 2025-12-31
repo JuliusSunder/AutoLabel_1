@@ -136,6 +136,7 @@ const createWindow = () => {
     width: 800,
     height: 600,
     title: 'AutoLabel',
+    icon: path.join(__dirname, '../../icons/icon_256x256.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

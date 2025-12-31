@@ -36,7 +36,9 @@ async function generateIcons() {
   // Load source image
   const logoBuffer = fs.readFileSync(LOGO_SOURCE);
   const logoMetadata = await sharp(logoBuffer).metadata();
-  console.log(`✓ Loaded logo: ${logoMetadata.width}x${logoMetadata.height}px\n`);
+  const hasTransparency = logoMetadata.hasAlpha || logoMetadata.channels === 4;
+  console.log(`✓ Loaded logo: ${logoMetadata.width}x${logoMetadata.height}px`);
+  console.log(`  Channels: ${logoMetadata.channels} (${hasTransparency ? '✓ Has transparency' : '✗ No transparency'})\n`);
   
   // Generate PNG icons for all sizes (used for both Windows and macOS)
   console.log('Generating PNG icons...');
@@ -46,11 +48,16 @@ async function generateIcons() {
   for (const size of allSizes) {
     const outputPath = path.join(ICONS_DIR, `icon_${size}x${size}.png`);
     const pngBuffer = await sharp(logoBuffer)
+      .ensureAlpha() // Stelle sicher, dass Alpha-Kanal vorhanden ist
       .resize(size, size, {
         fit: 'contain',
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
+        background: { r: 0, g: 0, b: 0, alpha: 0 } // Transparenter Hintergrund
       })
-      .png()
+      .png({ 
+        force: true, // Erzwinge PNG-Format mit Alpha-Kanal
+        compressionLevel: 9,
+        adaptiveFiltering: true
+      })
       .toBuffer();
     
     fs.writeFileSync(outputPath, pngBuffer);
