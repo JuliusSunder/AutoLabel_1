@@ -249,12 +249,6 @@ export async function POST(req: NextRequest) {
       remaining: 0,
       limit: 0,
     });
-
-    return NextResponse.json({
-      allowed: true,
-      remaining: remaining - labelCount,
-      limit: limits.labelsPerMonth,
-    });
   } catch (error) {
     console.error('[App Validate Label Creation] Error:', error);
     return NextResponse.json(
