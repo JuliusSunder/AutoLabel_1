@@ -68,7 +68,10 @@ export async function getUserFromToken(
           take: 1,
         },
         devices: {
-          where: { deviceId: payload.deviceId },
+          where: {
+            userId: payload.userId,
+            deviceId: payload.deviceId,
+          },
           take: 1,
         },
       },
@@ -150,6 +153,7 @@ export async function getDeviceCount(userId: string): Promise<number> {
 
 /**
  * Register or update device for user
+ * CHANGED: Multiple accounts can use the same device
  */
 export async function registerDevice(
   userId: string,
@@ -157,26 +161,21 @@ export async function registerDevice(
   deviceName?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Check if device already exists
-    const existingDevice = await prisma.device.findUnique({
-      where: { deviceId },
+    // Check if this user already has this device registered
+    const existingUserDevice = await prisma.device.findFirst({
+      where: {
+        userId,
+        deviceId,
+      },
     });
 
-    if (existingDevice) {
-      // Device exists - check if it belongs to this user
-      if (existingDevice.userId !== userId) {
-        return {
-          success: false,
-          error: 'Dieses Gerät ist bereits mit einem anderen Account registriert',
-        };
-      }
-
-      // Update existing device
+    if (existingUserDevice) {
+      // User already has this device - just update lastSeen
       await prisma.device.update({
-        where: { deviceId },
+        where: { id: existingUserDevice.id },
         data: {
           lastSeen: new Date(),
-          deviceName: deviceName || existingDevice.deviceName,
+          deviceName: deviceName || existingUserDevice.deviceName,
         },
       });
 
@@ -192,7 +191,8 @@ export async function registerDevice(
       };
     }
 
-    // Create new device
+    // Create new device entry for this user
+    // Note: Same deviceId can exist for multiple users now
     await prisma.device.create({
       data: {
         userId,

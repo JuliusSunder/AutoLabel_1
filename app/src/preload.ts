@@ -65,6 +65,9 @@ const autolabelAPI: AutoLabelAPI = {
     isAuthenticated: () => ipcRenderer.invoke('auth:isAuthenticated'),
     getCachedUserInfo: () => ipcRenderer.invoke('auth:getCachedUserInfo'),
   },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  },
 };
 
 // Expose to window object

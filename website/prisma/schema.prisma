@@ -9,19 +9,23 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String?   // Optional for OAuth users
+  name          String?
+  emailVerified DateTime? // Email verification timestamp
+  image         String?   // Profile image from OAuth
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  subscriptions       Subscription[]
-  licenses            License[]
-  usage               Usage[]
-  passwordResetTokens PasswordResetToken[]
-  devices             Device[]
-  refreshTokens       RefreshToken[]
+  subscriptions        Subscription[]
+  licenses             License[]
+  usage                Usage[]
+  passwordResetTokens  PasswordResetToken[]
+  devices              Device[]
+  refreshTokens        RefreshToken[]
+  accounts             Account[] // OAuth accounts
+  verificationTokens   VerificationToken[]
 }
 
 model Subscription {
@@ -96,13 +100,14 @@ model PasswordResetToken {
 model Device {
   id           String   @id @default(uuid())
   userId       String
-  deviceId     String   @unique  // UUID von App
+  deviceId     String   // UUID von App - NOT unique anymore (multiple accounts per device)
   deviceName   String?  // Optional: "Laptop", "Desktop"
   registeredAt DateTime @default(now())
   lastSeen     DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, deviceId])  // Unique combination of user + device
   @@index([userId])
   @@index([deviceId])
 }
@@ -115,6 +120,43 @@ model RefreshToken {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// OAuth Account model for NextAuth
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// Email verification tokens
+model VerificationToken {
+  id         String   @id @default(uuid())
+  userId     String
+  token      String   @unique
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

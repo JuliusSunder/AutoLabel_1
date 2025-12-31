@@ -76,12 +76,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check if user has a password (not OAuth-only)
+    if (!user.password) {
+      return NextResponse.json(
+        { error: 'Dieser Account verwendet OAuth-Login. Bitte loggen Sie sich über die Website ein.' },
+        { status: 401 }
+      );
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'Ungültige Email oder Passwort' },
         { status: 401 }
+      );
+    }
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        { error: 'Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Überprüfen Sie Ihr Postfach für die Verifizierungs-E-Mail.' },
+        { status: 403 }
       );
     }
 

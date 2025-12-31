@@ -195,6 +195,9 @@ export interface AutoLabelAPI {
       subscription: { plan: 'free' | 'plus' | 'pro'; status: string; expiresAt: string | null } | null;
     }>;
   };
+  shell: {
+    openExternal: (url: string) => Promise<void>;
+  };
 }
 
 // ============================================================================

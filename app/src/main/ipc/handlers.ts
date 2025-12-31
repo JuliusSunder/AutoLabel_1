@@ -11,6 +11,7 @@ import { registerPrintHandlers } from './print';
 import { registerConfigHandlers } from './config';
 import { registerLoggingHandlers } from './logging';
 import { registerAuthHandlers } from './auth';
+import { registerShellHandlers } from './shell';
 
 /**
  * Register all IPC handlers
@@ -21,6 +22,7 @@ export function registerAllHandlers(): void {
 
   registerLoggingHandlers();
   registerAuthHandlers();
+  registerShellHandlers();
   registerScanHandlers();
   registerSalesHandlers();
   registerLabelsHandlers();

@@ -49,11 +49,16 @@ export function AccountStatus() {
     }
   };
 
-  const handleUpgrade = () => {
-    // Use environment variable or fallback to localhost
-    // In production, VITE_WEBSITE_URL will be set via build-time environment variable
-    const websiteUrl = import.meta.env.VITE_WEBSITE_URL || 'http://localhost:3000';
-    window.open(`${websiteUrl}/#pricing`, '_blank');
+  const handleUpgrade = async () => {
+    try {
+      // Use environment variable or fallback to localhost
+      // In production, VITE_WEBSITE_URL will be set via build-time environment variable
+      const websiteUrl = import.meta.env.VITE_WEBSITE_URL || 'http://localhost:3000';
+      await window.autolabel.shell.openExternal(`${websiteUrl}/#pricing`);
+    } catch (error) {
+      console.error('Failed to open pricing page:', error);
+      toast.error('Fehler beim Öffnen der Pricing-Seite');
+    }
   };
 
   const handleRefresh = () => {

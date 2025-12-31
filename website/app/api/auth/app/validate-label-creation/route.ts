@@ -98,11 +98,11 @@ export async function POST(req: NextRequest) {
     // Get current plan
     const plan = (user.subscription?.plan || 'free') as 'free' | 'plus' | 'pro';
     const limits = USAGE_LIMITS[plan];
+    const currentMonth = getCurrentMonth();
 
-    // Check if plan is unlimited
-    if (limits.labelsPerMonth === -1) {
-      // Unlimited - always allowed, but still track usage
-      const currentMonth = getCurrentMonth();
+    // PRO PLAN: Unlimited, account-based
+    if (plan === 'pro' && limits.labelsPerMonth === -1) {
+      // Track usage per account
       await prisma.usage.upsert({
         where: {
           userId_deviceId_month: {
@@ -131,51 +131,123 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Get current usage
-    const currentMonth = getCurrentMonth();
-    const usage = await prisma.usage.findUnique({
-      where: {
-        userId_deviceId_month: {
-          userId: user.id,
+    // FREE PLAN: Device-based (shared across all free accounts on same device)
+    if (plan === 'free') {
+      // Get total usage for this device across ALL free plan users
+      const deviceUsage = await prisma.usage.aggregate({
+        where: {
           deviceId: payload.deviceId,
           month: currentMonth,
+          plan: 'free',
         },
-      },
-    });
+        _sum: {
+          labelsUsed: true,
+        },
+      });
 
-    const currentUsage = usage?.labelsUsed || 0;
-    const remaining = limits.labelsPerMonth - currentUsage;
+      const currentUsage = deviceUsage._sum.labelsUsed || 0;
+      const remaining = limits.labelsPerMonth - currentUsage;
 
-    // Check if would exceed limit
-    if (currentUsage + labelCount > limits.labelsPerMonth) {
+      // Check if would exceed device limit
+      if (currentUsage + labelCount > limits.labelsPerMonth) {
+        return NextResponse.json({
+          allowed: false,
+          reason: `Geräte-Limit erreicht. Dieses Gerät hat ${currentUsage} von ${limits.labelsPerMonth} kostenlosen Labels verwendet. Upgraden Sie für mehr Labels.`,
+          remaining: Math.max(0, remaining),
+          limit: limits.labelsPerMonth,
+        });
+      }
+
+      // Track usage for this user on this device
+      await prisma.usage.upsert({
+        where: {
+          userId_deviceId_month: {
+            userId: user.id,
+            deviceId: payload.deviceId,
+            month: currentMonth,
+          },
+        },
+        update: {
+          labelsUsed: { increment: labelCount },
+          updatedAt: new Date(),
+        },
+        create: {
+          userId: user.id,
+          deviceId: payload.deviceId,
+          plan,
+          month: currentMonth,
+          labelsUsed: labelCount,
+        },
+      });
+
       return NextResponse.json({
-        allowed: false,
-        reason: `Monatslimit erreicht. Sie haben ${currentUsage} von ${limits.labelsPerMonth} Labels verwendet. Upgraden Sie für mehr Labels.`,
-        remaining: Math.max(0, remaining),
+        allowed: true,
+        remaining: remaining - labelCount,
         limit: limits.labelsPerMonth,
       });
     }
 
-    // Increment usage counter
-    await prisma.usage.upsert({
-      where: {
-        userId_deviceId_month: {
+    // PLUS PLAN: Account-based (each account has its own 60 labels)
+    if (plan === 'plus') {
+      // Get usage for THIS user only
+      const usage = await prisma.usage.findUnique({
+        where: {
+          userId_deviceId_month: {
+            userId: user.id,
+            deviceId: payload.deviceId,
+            month: currentMonth,
+          },
+        },
+      });
+
+      const currentUsage = usage?.labelsUsed || 0;
+      const remaining = limits.labelsPerMonth - currentUsage;
+
+      // Check if would exceed account limit
+      if (currentUsage + labelCount > limits.labelsPerMonth) {
+        return NextResponse.json({
+          allowed: false,
+          reason: `Monatslimit erreicht. Sie haben ${currentUsage} von ${limits.labelsPerMonth} Labels verwendet.`,
+          remaining: Math.max(0, remaining),
+          limit: limits.labelsPerMonth,
+        });
+      }
+
+      // Track usage for this user
+      await prisma.usage.upsert({
+        where: {
+          userId_deviceId_month: {
+            userId: user.id,
+            deviceId: payload.deviceId,
+            month: currentMonth,
+          },
+        },
+        update: {
+          labelsUsed: { increment: labelCount },
+          updatedAt: new Date(),
+        },
+        create: {
           userId: user.id,
           deviceId: payload.deviceId,
+          plan,
           month: currentMonth,
+          labelsUsed: labelCount,
         },
-      },
-      update: {
-        labelsUsed: { increment: labelCount },
-        updatedAt: new Date(),
-      },
-      create: {
-        userId: user.id,
-        deviceId: payload.deviceId,
-        plan,
-        month: currentMonth,
-        labelsUsed: labelCount,
-      },
+      });
+
+      return NextResponse.json({
+        allowed: true,
+        remaining: remaining - labelCount,
+        limit: limits.labelsPerMonth,
+      });
+    }
+
+    // Fallback (should not reach here)
+    return NextResponse.json({
+      allowed: false,
+      reason: 'Ungültiger Plan',
+      remaining: 0,
+      limit: 0,
     });
 
     return NextResponse.json({

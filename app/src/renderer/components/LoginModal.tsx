@@ -17,45 +17,64 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[LoginModal] handleSubmit called');
 
     if (!email || !password) {
+      console.log('[LoginModal] Email or password missing');
       toast.error('Bitte geben Sie Email und Passwort ein');
       return;
     }
 
+    console.log('[LoginModal] Starting login process...');
     setIsLoading(true);
 
     try {
+      console.log('[LoginModal] Calling window.autolabel.auth.login...');
       const result = await window.autolabel.auth.login(email, password);
+      console.log('[LoginModal] Login result:', result);
 
       if (result.success) {
+        console.log('[LoginModal] Login successful');
         toast.success('Login erfolgreich!');
         
         if (onLoginSuccess) {
+          console.log('[LoginModal] Calling onLoginSuccess callback');
           onLoginSuccess();
         }
       } else {
+        console.log('[LoginModal] Login failed:', result.error);
         toast.error(result.error || 'Login fehlgeschlagen');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('[LoginModal] Login error:', error);
       toast.error('Ein unerwarteter Fehler ist aufgetreten');
     } finally {
+      console.log('[LoginModal] Setting isLoading to false');
       setIsLoading(false);
     }
   };
 
-  const handleForgotPassword = () => {
-    // Open website in default browser
-    // In production, this should be set via build-time environment variable
-    const websiteUrl = import.meta.env.VITE_WEBSITE_URL || 'http://localhost:3000';
-    window.open(`${websiteUrl}/forgot-password`, '_blank');
+  const handleForgotPassword = async () => {
+    try {
+      // Open website in default browser
+      // In production, this should be set via build-time environment variable
+      const websiteUrl = import.meta.env.VITE_WEBSITE_URL || 'http://localhost:3000';
+      await window.autolabel.shell.openExternal(`${websiteUrl}/forgot-password`);
+    } catch (error) {
+      console.error('Failed to open forgot password page:', error);
+      toast.error('Fehler beim Öffnen der Passwort-Wiederherstellung');
+    }
   };
 
-  const handleCreateAccount = () => {
-    // Open website registration in default browser
-    const websiteUrl = import.meta.env.VITE_WEBSITE_URL || 'http://localhost:3000';
-    window.open(`${websiteUrl}/register`, '_blank');
+  const handleCreateAccount = async () => {
+    try {
+      // Open website registration in default browser
+      const websiteUrl = import.meta.env.VITE_WEBSITE_URL || 'http://localhost:3000';
+      await window.autolabel.shell.openExternal(`${websiteUrl}/register`);
+    } catch (error) {
+      console.error('Failed to open registration page:', error);
+      toast.error('Fehler beim Öffnen der Registrierungsseite');
+    }
   };
 
   return (

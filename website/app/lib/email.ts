@@ -95,6 +95,90 @@ export async function sendPaymentFailedEmail(email: string, name?: string | null
   }
 }
 
+export async function sendVerificationEmail(
+  email: string,
+  verificationToken: string,
+  name?: string | null
+) {
+  if (!process.env.RESEND_API_KEY) {
+    const error = new Error("RESEND_API_KEY ist nicht konfiguriert. Bitte setzen Sie RESEND_API_KEY in Ihrer .env Datei.");
+    console.error("Email configuration error:", error.message);
+    throw error;
+  }
+
+  const emailFrom = process.env.EMAIL_FROM || "noreply@autolabel.com";
+  
+  try {
+    const verificationUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/verify-email?token=${verificationToken}`;
+    
+    console.log("=== SENDING VERIFICATION EMAIL ===");
+    console.log("To:", email);
+    console.log("From:", emailFrom);
+    console.log("Verification URL:", verificationUrl);
+    
+    const result = await resend.emails.send({
+      from: emailFrom,
+      to: email,
+      subject: "Bestätigen Sie Ihre E-Mail-Adresse - AutoLabel",
+      html: `
+        <h1>Willkommen bei AutoLabel${name ? `, ${name}` : ""}!</h1>
+        <p>Vielen Dank für Ihre Registrierung bei AutoLabel.</p>
+        <p>Bitte bestätigen Sie Ihre E-Mail-Adresse, um Ihr Konto zu aktivieren:</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${verificationUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600;">
+            E-Mail bestätigen
+          </a>
+        </div>
+        
+        <p style="color: #666; font-size: 14px;">
+          Oder kopieren Sie diesen Link in Ihren Browser:<br>
+          <code style="background-color: #f5f5f5; padding: 8px; display: block; margin-top: 8px; border-radius: 4px; word-break: break-all;">
+            ${verificationUrl}
+          </code>
+        </p>
+        
+        <p style="color: #666; font-size: 14px; margin-top: 20px;">
+          <strong>Wichtig:</strong> Dieser Link ist 24 Stunden gültig. Nach der Bestätigung können Sie sich einloggen und die AutoLabel Desktop-App verwenden.
+        </p>
+        
+        <br>
+        <p>Ihr AutoLabel Team</p>
+      `,
+    });
+
+    console.log("=== EMAIL SEND RESULT ===");
+    console.log("Result ID:", result?.data?.id);
+    console.log("Result error:", result?.error);
+    
+    if (result?.error) {
+      throw new Error(`Resend API Error: ${JSON.stringify(result.error)}`);
+    }
+    
+    if (!result?.data?.id) {
+      throw new Error("Resend API returned no email ID. Email may not have been sent.");
+    }
+    
+    console.log("Verification email sent successfully. Email ID:", result.data.id);
+    return result;
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+    
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      
+      if (error.message.includes("API key") || error.message.includes("Unauthorized")) {
+        throw new Error("RESEND_API_KEY ist ungültig oder fehlt. Bitte überprüfen Sie Ihre .env Datei.");
+      }
+      if (error.message.includes("domain") || error.message.includes("Domain")) {
+        throw new Error("E-Mail-Domain ist nicht verifiziert. Bitte verifizieren Sie Ihre Domain im Resend Dashboard.");
+      }
+    }
+    
+    throw error;
+  }
+}
+
 export async function sendPasswordResetEmail(
   email: string,
   resetToken: string,

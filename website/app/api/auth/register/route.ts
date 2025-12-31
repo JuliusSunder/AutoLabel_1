@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/app/lib/prisma";
+import { randomBytes } from "crypto";
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,12 +47,18 @@ export async function POST(req: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Generate verification token
+    const verificationToken = randomBytes(32).toString("hex");
+    const verificationExpiry = new Date();
+    verificationExpiry.setHours(verificationExpiry.getHours() + 24); // 24 hours
+
+    // Create user (email NOT verified yet)
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name: name || null,
+        emailVerified: null, // Not verified yet
       },
       select: {
         id: true,
@@ -71,19 +78,30 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send welcome email
+    // Create verification token
+    await prisma.verificationToken.create({
+      data: {
+        userId: user.id,
+        token: verificationToken,
+        expiresAt: verificationExpiry,
+      },
+    });
+
+    // Send verification email
     try {
-      const { sendWelcomeEmail } = await import("@/app/lib/email");
-      await sendWelcomeEmail(user.email, user.name);
+      const { sendVerificationEmail } = await import("@/app/lib/email");
+      await sendVerificationEmail(user.email, verificationToken, user.name);
     } catch (emailError) {
-      console.error("Error sending welcome email:", emailError);
-      // Don't fail registration if email fails
+      console.error("Error sending verification email:", emailError);
+      // Don't fail registration if email fails, but log it
+      console.warn("User registered but verification email could not be sent. User ID:", user.id);
     }
 
     return NextResponse.json(
       {
-        message: "Registrierung erfolgreich",
+        message: "Registrierung erfolgreich. Bitte überprüfen Sie Ihre E-Mail, um Ihr Konto zu bestätigen.",
         user,
+        requiresVerification: true,
       },
       { status: 201 }
     );
