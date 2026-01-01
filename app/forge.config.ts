@@ -17,8 +17,13 @@ const config: ForgeConfig = {
     icon: './icons/icon_256x256', // Electron Forge will add .ico/.icns automatically
     appCopyright: 'Copyright © 2025 JuliusSunder',
     appBundleId: 'com.autolabel.app',
+    // Include external tools (SumatraPDF, ImageMagick) as extra resources
+    extraResource: [
+      './bin/SumatraPDF',
+      './bin/ImageMagick',
+    ],
     asar: {
-      unpack: '**/*.{node,dll,dylib,so}', // Don't pack native modules in ASAR
+      unpack: '**/*.{node,dll,dylib,so,exe}', // Don't pack native modules and executables in ASAR
     },
     // Ensure native modules are included
     ignore: [

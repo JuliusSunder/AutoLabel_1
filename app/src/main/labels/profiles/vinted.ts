@@ -16,6 +16,7 @@
 import { app } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import { execSync } from 'node:child_process';
 import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import type { LabelProfile, ProfileContext } from './base';
@@ -39,6 +40,46 @@ function getTempDir(): string {
   }
 
   return tempPath;
+}
+
+/**
+ * Find ImageMagick executable
+ * Searches in bundled app directory and common installation paths
+ */
+function findImageMagick(): string | null {
+  const possiblePaths = [
+    // Bundled with app (primary location for packaged builds)
+    // IMPORTANT: process.resourcesPath must be checked FIRST for production builds
+    path.join(process.resourcesPath || '', 'bin', 'ImageMagick', 'magick.exe'),
+    // Development paths (when running from source)
+    path.join(app.getAppPath(), 'bin', 'ImageMagick', 'magick.exe'),
+    path.join(process.cwd(), 'app', 'bin', 'ImageMagick', 'magick.exe'),
+    // System installations (fallback)
+    'C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe',
+    'C:\\Program Files\\ImageMagick-7.1.0-Q16-HDRI\\magick.exe',
+    'C:\\Program Files (x86)\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe',
+    'C:\\Program Files (x86)\\ImageMagick-7.1.0-Q16-HDRI\\magick.exe',
+  ];
+
+  // Check all possible paths
+  for (const magickPath of possiblePaths) {
+    if (fs.existsSync(magickPath)) {
+      console.debug(`[Vinted Profile] Found ImageMagick at: ${magickPath}`);
+      return magickPath;
+    }
+  }
+
+  // Try to find in PATH
+  try {
+    execSync('where magick.exe', { encoding: 'utf-8', windowsHide: true });
+    console.debug('[Vinted Profile] Found ImageMagick in system PATH');
+    return 'magick.exe';
+  } catch {
+    // Not in PATH
+  }
+
+  console.warn('[Vinted Profile] ImageMagick not found in any standard location');
+  return null;
 }
 
 /**
@@ -114,14 +155,22 @@ async function processDpdPdf(inputPath: string): Promise<string> {
 async function processHermesPdf(inputPath: string): Promise<string> {
   console.log('[Vinted Profile] Processing Hermes PDF with ImageMagick');
 
-  const { execSync } = await import('child_process');
+  // Find ImageMagick executable
+  const magickPath = findImageMagick();
+  if (!magickPath) {
+    throw new Error(
+      'ImageMagick nicht gefunden. Hermes-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
+    );
+  }
+
   const tempImagePath = path.join(getTempDir(), `hermes_processed_${Date.now()}.png`);
   
   try {
     // Use ImageMagick to: convert PDF -> crop upper half -> rotate -90°
-    const command = `magick -density ${TARGET_DPI} "${inputPath}[0]" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
+    const command = `"${magickPath}" -density ${TARGET_DPI} "${inputPath}[0]" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
     console.log('[Vinted Profile] Executing ImageMagick:', command);
-    execSync(command);
+    execSync(command, { windowsHide: true });
     
     console.log('[Vinted Profile] ImageMagick processing complete');
 
@@ -181,14 +230,22 @@ async function processHermesPdf(inputPath: string): Promise<string> {
 async function processStandardPdf(inputPath: string): Promise<string> {
   console.log('[Vinted Profile] Processing standard PDF (GLS/DHL) with ImageMagick');
 
-  const { execSync } = await import('child_process');
+  // Find ImageMagick executable
+  const magickPath = findImageMagick();
+  if (!magickPath) {
+    throw new Error(
+      'ImageMagick nicht gefunden. GLS/DHL-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
+    );
+  }
+
   const tempImagePath = path.join(getTempDir(), `standard_processed_${Date.now()}.png`);
   
   try {
     // Use ImageMagick to: convert PDF -> crop upper half -> rotate -90°
-    const command = `magick -density ${TARGET_DPI} "${inputPath}[0]" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
+    const command = `"${magickPath}" -density ${TARGET_DPI} "${inputPath}[0]" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
     console.log('[Vinted Profile] Executing ImageMagick:', command);
-    execSync(command);
+    execSync(command, { windowsHide: true });
     
     console.log('[Vinted Profile] ImageMagick processing complete');
 
@@ -291,14 +348,22 @@ async function processDpdImage(inputPath: string): Promise<string> {
 async function processHermesImage(inputPath: string): Promise<string> {
   console.log('[Vinted Profile] Processing Hermes image with ImageMagick');
 
-  const { execSync } = await import('child_process');
+  // Find ImageMagick executable
+  const magickPath = findImageMagick();
+  if (!magickPath) {
+    throw new Error(
+      'ImageMagick nicht gefunden. Hermes-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
+    );
+  }
+
   const tempImagePath = path.join(getTempDir(), `hermes_img_processed_${Date.now()}.png`);
   
   try {
     // Use ImageMagick to: crop upper half -> rotate -90°
-    const command = `magick "${inputPath}" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
+    const command = `"${magickPath}" "${inputPath}" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
     console.log('[Vinted Profile] Executing ImageMagick:', command);
-    execSync(command);
+    execSync(command, { windowsHide: true });
     
     console.log('[Vinted Profile] ImageMagick processing complete');
 
@@ -336,14 +401,22 @@ async function processHermesImage(inputPath: string): Promise<string> {
 async function processStandardImage(inputPath: string): Promise<string> {
   console.log('[Vinted Profile] Processing standard image (GLS/DHL) with ImageMagick');
 
-  const { execSync } = await import('child_process');
+  // Find ImageMagick executable
+  const magickPath = findImageMagick();
+  if (!magickPath) {
+    throw new Error(
+      'ImageMagick nicht gefunden. GLS/DHL-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
+    );
+  }
+
   const tempImagePath = path.join(getTempDir(), `standard_img_processed_${Date.now()}.png`);
   
   try {
     // Use ImageMagick to: crop upper half -> rotate -90°
-    const command = `magick "${inputPath}" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
+    const command = `"${magickPath}" "${inputPath}" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
     console.log('[Vinted Profile] Executing ImageMagick:', command);
-    execSync(command);
+    execSync(command, { windowsHide: true });
     
     console.log('[Vinted Profile] ImageMagick processing complete');
 

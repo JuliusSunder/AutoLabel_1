@@ -6,6 +6,7 @@
 import { printPdf, getDefaultPrinter, listPrinters, clearPrinterQueue } from './printer-manager';
 import * as printJobsRepo from '../database/repositories/print-jobs';
 import * as labelsRepo from '../database/repositories/labels';
+import { validateLabelCreation } from '../auth/auth-manager';
 import type { PrintJob } from '../../shared/types';
 import fs from 'node:fs';
 
@@ -126,6 +127,21 @@ export async function startPrintJob(
     throw new Error(`Drucker "${targetPrinter}" nicht verfügbar`);
   }
 
+  // IMPORTANT: Validate label creation with server BEFORE printing
+  // This is where the usage counter gets incremented
+  const labelCount = labels.length;
+  console.log(`[Print Queue] Validating label creation with server...`, { labelCount });
+  const validation = await validateLabelCreation(labelCount);
+  
+  if (!validation.allowed) {
+    throw new Error(validation.reason || 'Label-Druck nicht erlaubt');
+  }
+
+  console.log(`[Print Queue] Label creation validated by server`, { 
+    remaining: validation.remaining,
+    limit: validation.limit,
+  });
+
   // Create print job
   const printJob = printJobsRepo.createPrintJob({
     printerName: targetPrinter,
@@ -134,9 +150,8 @@ export async function startPrintJob(
 
   console.log(`[Print Queue] Created print job: ${printJob.id}`);
 
-  // NOTE: Usage tracking is now handled server-side during label validation
-  // The server increments usage when validateLabelCreation is called in labels.ts
-  // No local usage increment needed here
+  // NOTE: Usage counter is now incremented on server via validateLabelCreation above
+  // No local increment needed
 
   // Start printing in background
   processPrintJob(printJob.id).catch((error) => {
@@ -255,6 +270,21 @@ export async function startQueuedJob(jobId: string): Promise<void> {
   if (!printerExists) {
     throw new Error(`Drucker "${job.printerName}" nicht verfügbar`);
   }
+
+  // IMPORTANT: Validate label creation with server BEFORE printing
+  // This is where the usage counter gets incremented for queued jobs
+  const labelCount = job.labelIds.length;
+  console.log(`[Print Queue] Validating label creation with server...`, { labelCount });
+  const validation = await validateLabelCreation(labelCount);
+  
+  if (!validation.allowed) {
+    throw new Error(validation.reason || 'Label-Druck nicht erlaubt');
+  }
+
+  console.log(`[Print Queue] Label creation validated by server`, { 
+    remaining: validation.remaining,
+    limit: validation.limit,
+  });
 
   // Start processing
   processPrintJob(jobId).catch((error) => {

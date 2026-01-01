@@ -151,35 +151,45 @@ export async function getDefaultPrinter(): Promise<string | null> {
 
 /**
  * Find SumatraPDF executable
- * Searches in common installation paths
+ * Searches in bundled app directory and common installation paths
  */
 function findSumatraPDF(): string | null {
   const possiblePaths = [
+    // Bundled with app (primary location for packaged builds)
+    // IMPORTANT: process.resourcesPath must be checked FIRST for production builds
+    path.join(process.resourcesPath || '', 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
+    // Development paths (when running from source)
+    path.join(app.getAppPath(), 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
+    path.join(process.cwd(), 'app', 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
+    // Legacy bundled paths (for backwards compatibility)
+    path.join(process.resourcesPath || '', 'bin', 'SumatraPDF.exe'),
+    path.join(app.getAppPath(), 'bin', 'SumatraPDF.exe'),
+    path.join(process.cwd(), 'app', 'bin', 'SumatraPDF.exe'),
+    // System installations (fallback)
     'C:\\Program Files\\SumatraPDF\\SumatraPDF.exe',
     'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
-    path.join(process.cwd(), 'app', 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
-    path.join(app.getAppPath(), 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
-    path.join(process.cwd(), 'app', 'bin', 'SumatraPDF.exe'), // Legacy path
-    path.join(app.getAppPath(), 'bin', 'SumatraPDF.exe'), // Legacy path
   ];
 
+  console.debug('[Printer] Searching for SumatraPDF...');
   for (const sumatraPath of possiblePaths) {
+    console.debug(`[Printer] Checking: ${sumatraPath}`);
     if (fs.existsSync(sumatraPath)) {
-      console.debug(`[Printer] Found SumatraPDF at: ${sumatraPath}`);
+      console.log(`[Printer] ✓ Found SumatraPDF at: ${sumatraPath}`);
       return sumatraPath;
     }
   }
 
   // Try to find in PATH
   try {
-    execSync('where SumatraPDF.exe', { encoding: 'utf-8' });
-    console.debug('[Printer] Found SumatraPDF in system PATH');
+    execSync('where SumatraPDF.exe', { encoding: 'utf-8', windowsHide: true });
+    console.log('[Printer] ✓ Found SumatraPDF in system PATH');
     return 'SumatraPDF.exe';
   } catch {
     // Not in PATH
   }
 
-  console.warn('[Printer] SumatraPDF not found in any standard location');
+  console.warn('[Printer] ⚠ SumatraPDF not found in any location');
+  console.warn('[Printer] Searched paths:', possiblePaths);
   return null;
 }
 
@@ -243,7 +253,10 @@ async function printPdfWithSumatra(
 ): Promise<void> {
   const sumatraPath = findSumatraPDF();
   if (!sumatraPath) {
-    throw new Error('Drucker-Software nicht installiert');
+    throw new Error(
+      'SumatraPDF nicht gefunden. Drucken könnte Probleme haben. ' +
+      'Bitte kontaktieren Sie den Support falls Druckprobleme auftreten.'
+    );
   }
 
   // NOTE: We don't check printer availability beforehand because Windows status is unreliable
@@ -399,7 +412,13 @@ export async function printPdf(
       console.log('[Printer] ✓ Successfully printed with SumatraPDF');
       return;
     } catch (sumatraError) {
-      console.warn('[Printer] SumatraPDF failed, trying Electron fallback:', sumatraError);
+      const errorMessage = sumatraError instanceof Error ? sumatraError.message : 'Unknown error';
+      console.warn('[Printer] SumatraPDF failed:', errorMessage);
+      
+      // If SumatraPDF not found, warn user but continue with fallback
+      if (errorMessage.includes('nicht gefunden')) {
+        console.warn('[Printer] ⚠ Using Electron fallback - may have rendering issues with label printers');
+      }
       
       // Fall back to Electron method
       await printPdfWithElectron(pdfPath, targetPrinter);

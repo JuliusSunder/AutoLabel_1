@@ -9,7 +9,7 @@ import { generatePDFThumbnail } from '../labels/pdf-thumbnail';
 import type { PreparedLabel, FooterConfig } from '../../shared/types';
 import { logError, logInfo, logDebug } from '../utils/logger';
 import { getUserFriendlyError } from '../utils/error-messages';
-import { validateLabelCreation, getCachedUserInfo } from '../auth/auth-manager';
+import { getCachedUserInfo } from '../auth/auth-manager';
 
 /**
  * Register labels IPC handlers
@@ -43,33 +43,15 @@ export function registerLabelsHandlers(): void {
           footerConfig = undefined; // Ignore footer config for free plan
         }
 
-        // Server-seitige Validierung: Check usage limits before creating labels
-        const labelCount = params.saleIds.length;
-        console.log('[IPC] Validating label creation with server...', { labelCount });
-        const validation = await validateLabelCreation(labelCount);
-        
-        if (!validation.allowed) {
-          const error = new Error(validation.reason || 'Label-Erstellung nicht erlaubt');
-          logError('Label creation denied by server', error, { 
-            labelCount,
-            reason: validation.reason,
-          });
-          throw error;
-        }
-
-        console.log('[IPC] Label creation validated by server', { 
-          remaining: validation.remaining,
-          limit: validation.limit,
-        });
+        // NOTE: Label count validation is now done at print time, not prepare time
+        // This allows users to prepare labels without consuming their quota
+        // The quota is only consumed when actually printing
 
         // Prepare labels (with or without footer depending on plan)
         const preparedLabels = await prepareLabels(
           params.saleIds,
           footerConfig
         );
-        
-        // Note: Usage counter is already incremented on server
-        // No local increment needed
         
         console.log(`[IPC] Prepared ${preparedLabels.length} labels`);
         logInfo('Label preparation completed', { 

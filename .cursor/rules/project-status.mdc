@@ -1,0 +1,132 @@
+---
+alwaysApply: true
+---
+
+# AutoLabel Projekt Status
+
+## Projektstruktur
+- **app/** - Electron Desktop App (TypeScript, React, SQLite)
+- **website/** - Next.js 16 Website (TypeScript, Prisma, Stripe)
+
+## Desktop App - Implementierte Features
+
+### Email Scanning
+- ✅ Vinted-optimierter Scanner (`app/src/main/email/scanner.ts`)
+- ✅ Vinted Parser für Carrier-Erkennung (`app/src/main/email/parsers/vinted-parser.ts`)
+- ✅ IMAP Client (`app/src/main/email/imap-client.ts`)
+- ✅ Multi-Account Support (`app/src/main/email/accounts.ts`)
+- ✅ Attachment Handler (`app/src/main/email/attachment-handler.ts`)
+
+### Label Processing
+- ✅ Label Normalisierung auf 100×150mm (`app/src/main/labels/`)
+- ✅ Footer Overlay System
+- ✅ PDF Processing mit SumatraPDF
+
+### Printing
+- ✅ Print Queue System (`app/src/main/print/`)
+- ✅ OS Printer Integration
+- ✅ Batch Printing
+
+### Database & IPC
+- ✅ SQLite Schema (`app/src/main/database/schema.ts`)
+- ✅ IPC API (`app/src/preload.ts`)
+- ✅ Type-safe API (`app/src/shared/types.ts`)
+
+## Website - Implementierte Features
+
+### Authentication
+- ✅ NextAuth.js mit Credentials Provider (`website/app/api/auth/[...nextauth]/route.ts`)
+- ✅ Google OAuth Integration (`website/app/api/auth/[...nextauth]/route.ts`)
+- ✅ User Registration (`website/app/api/auth/register/route.ts`)
+- ✅ Login/Register Pages (`website/app/login/page.tsx`, `website/app/register/page.tsx`)
+- ✅ Protected Routes (`website/middleware.ts`)
+
+### Payment & Licensing
+- ✅ Stripe Checkout Integration (`website/app/api/stripe/create-checkout-session/route.ts`)
+- ✅ Stripe Webhook Handler (`website/app/api/stripe/webhook/route.ts`)
+- ✅ License Key System (UUID v4, automatisch nach Payment)
+- ✅ Subscription Management (Prisma Schema: `website/prisma/schema.prisma`)
+- ✅ Pricing Page (`website/app/components/sections/Pricing.tsx`)
+
+### App Download
+- ✅ Download API mit License Validation (`website/app/api/download/app/route.ts`)
+- ✅ Download Page (`website/app/download/page.tsx`)
+- ✅ Dashboard mit License Display (`website/app/dashboard/page.tsx`)
+
+### Email Integration
+- ✅ Resend Integration (`website/app/lib/email.ts`)
+- ✅ Welcome Email, License Email, Payment Failed Email
+- ✅ Email Templates (`website/app/lib/email.ts`)
+
+## Konfigurationsstatus
+
+### Environment Variables (Website)
+**Erforderlich in `website/.env.local`:**
+- `DATABASE_URL` - Prisma Database (SQLite: `file:./prisma/dev.db`)
+- `NEXTAUTH_SECRET` - NextAuth Secret (generieren: `openssl rand -base64 32`)
+- `NEXTAUTH_URL` - App URL (`http://localhost:3000` oder Production URL)
+- `GOOGLE_CLIENT_ID` - Google OAuth Client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth Client Secret
+- `RESEND_API_KEY` - Resend API Key für Emails
+- `EMAIL_FROM` - Absender-Email (verifizierte Domain)
+- `STRIPE_SECRET_KEY` - Stripe Secret Key (`sk_test_...` oder `sk_live_...`)
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe Publishable Key
+- `STRIPE_WEBHOOK_SECRET` - Stripe Webhook Secret (`whsec_...`)
+- `NEXT_PUBLIC_STRIPE_PRICE_ID_PLUS_MONTHLY` - Stripe Price ID
+- `NEXT_PUBLIC_STRIPE_PRICE_ID_PLUS_YEARLY` - Stripe Price ID
+- `NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY` - Stripe Price ID
+- `NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_YEARLY` - Stripe Price ID
+- `APP_DOWNLOAD_URL` - URL zum App Installer
+- `WEBSITE_URL` - Website URL für Desktop App
+- `JWT_SECRET` - JWT Secret für Desktop App Auth
+
+### Environment Variables (Desktop App)
+**Optional in `app/.env`:**
+- `WEBSITE_URL` - Website URL für Login/Registrierung
+- `WINDOWS_CERT_PATH` - Code Signing Certificate (optional)
+- `WINDOWS_CERT_PASSWORD` - Certificate Password (optional)
+- `GITHUB_TOKEN` - GitHub Token für Publishing (optional)
+
+### Setup Status
+- ✅ Stripe Integration: **Vollständig implementiert** (Keys müssen in `.env.local` gesetzt werden)
+- ✅ Database: **Prisma + SQLite** (Schema vorhanden, `npx prisma db push` ausführen)
+- ✅ Email Service: **Resend integriert** (API Key erforderlich)
+- ✅ Google OAuth: **Implementiert** (Client ID/Secret erforderlich)
+
+## Wichtige Dateien
+
+### Desktop App Core
+- `app/src/main.ts` - Electron Main Process Entry
+- `app/src/preload.ts` - IPC Bridge
+- `app/src/renderer/App.tsx` - React UI Entry
+- `app/src/main/email/scanner.ts` - Email Scanner
+- `app/src/main/labels/` - Label Processing
+- `app/src/main/print/` - Printing System
+- `app/src/main/database/` - Database Layer
+
+### Website Core
+- `website/app/api/auth/[...nextauth]/route.ts` - NextAuth Handler
+- `website/app/api/stripe/` - Stripe API Routes
+- `website/app/api/download/app/route.ts` - Download API
+- `website/prisma/schema.prisma` - Database Schema
+- `website/middleware.ts` - Route Protection
+- `website/app/lib/stripe-server.ts` - Stripe Server Client
+- `website/app/lib/email.ts` - Email Service
+
+## Feature-Status
+
+| Feature | Status | Dateien |
+|---------|--------|---------|
+| Email Scanning (Vinted) | ✅ Implementiert | `app/src/main/email/scanner.ts`, `app/src/main/email/parsers/vinted-parser.ts` |
+| Label Processing | ✅ Implementiert | `app/src/main/labels/` |
+| Printing | ✅ Implementiert | `app/src/main/print/` |
+| User Authentication | ✅ Implementiert | `website/app/api/auth/`, `website/app/login/`, `website/app/register/` |
+| Stripe Payment | ✅ Implementiert | `website/app/api/stripe/`, `website/app/lib/stripe-server.ts` |
+| License System | ✅ Implementiert | `website/prisma/schema.prisma` (Licenses table), `website/app/api/stripe/webhook/route.ts` |
+| App Download | ✅ Implementiert | `website/app/api/download/app/route.ts`, `website/app/download/page.tsx` |
+| Email Service | ✅ Implementiert | `website/app/lib/email.ts` |
+
+## Nächste Schritte bei neuen Features
+1. Feature in dieser Datei dokumentieren oder gegebenenfalls überarbeiten
+2. Relevante Dateien in "Wichtige Dateien" auflisten
+3. Status in Feature-Tabelle aktualisieren

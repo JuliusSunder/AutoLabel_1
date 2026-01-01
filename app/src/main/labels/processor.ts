@@ -127,28 +127,42 @@ export async function prepareLabels(
 
         console.log(`[Processor] Prepared label: ${preparedLabel.id}`);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error(
           `[Processor] Error processing attachment ${selectedAttachment.id}:`,
           error
         );
+        
+        // Provide more helpful error messages
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage.includes('ImageMagick nicht gefunden')) {
+          userFriendlyMessage = `ImageMagick fehlt - Hermes/GLS/DHL Labels können nicht verarbeitet werden. Bitte kontaktieren Sie den Support.`;
+        } else if (errorMessage.includes('magick')) {
+          userFriendlyMessage = `ImageMagick-Fehler: ${errorMessage}`;
+        }
+        
         errors.push(
-          `Failed to process attachment ${selectedAttachment.id}: ${
-            error instanceof Error ? error.message : 'Unknown error'
-          }`
+          `Attachment ${selectedAttachment.id}: ${userFriendlyMessage}`
         );
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[Processor] Error processing sale ${saleId}:`, error);
       errors.push(
-        `Failed to process sale ${saleId}: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
+        `Sale ${saleId}: ${errorMessage}`
       );
     }
   }
 
   if (errors.length > 0) {
     console.warn('[Processor] Completed with errors:', errors);
+    // Log errors to help with debugging
+    console.warn('[Processor] Error summary:', {
+      totalSales: saleIds.length,
+      successfulLabels: preparedLabels.length,
+      failedSales: errors.length,
+      errors: errors,
+    });
   }
 
   console.log(`[Processor] Prepared ${preparedLabels.length} labels`);

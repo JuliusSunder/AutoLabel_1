@@ -8,12 +8,52 @@ import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { Canvas, createCanvas } from 'canvas';
 
 const execAsync = promisify(exec);
+
+/**
+ * Find ImageMagick executable
+ * Searches in bundled app directory and common installation paths
+ */
+function findImageMagick(): string | null {
+  const possiblePaths = [
+    // Bundled with app (primary location for packaged builds)
+    path.join(process.resourcesPath || '', 'bin', 'ImageMagick', 'magick.exe'),
+    path.join(app.getAppPath(), 'bin', 'ImageMagick', 'magick.exe'),
+    path.join(process.cwd(), 'app', 'bin', 'ImageMagick', 'magick.exe'),
+    // System installations
+    'C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe',
+    'C:\\Program Files\\ImageMagick-7.1.0-Q16-HDRI\\magick.exe',
+    'C:\\Program Files (x86)\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe',
+    'C:\\Program Files (x86)\\ImageMagick-7.1.0-Q16-HDRI\\magick.exe',
+  ];
+
+  console.debug('[Thumbnail] Searching for ImageMagick...');
+  for (const magickPath of possiblePaths) {
+    console.debug(`[Thumbnail] Checking: ${magickPath}`);
+    if (fs.existsSync(magickPath)) {
+      console.log(`[Thumbnail] ✓ Found ImageMagick at: ${magickPath}`);
+      return magickPath;
+    }
+  }
+
+  // Try to find in PATH
+  try {
+    execSync('where magick.exe', { encoding: 'utf-8', windowsHide: true });
+    console.log('[Thumbnail] ✓ Found ImageMagick in system PATH');
+    return 'magick.exe';
+  } catch {
+    // Not in PATH
+  }
+
+  console.warn('[Thumbnail] ⚠ ImageMagick not found in any location');
+  console.warn('[Thumbnail] Searched paths:', possiblePaths);
+  return null;
+}
 
 // Configure PDF.js to work in Node.js environment
 const NodeCanvasFactory = {
@@ -124,6 +164,13 @@ async function generatePDFThumbnailInternal(
   console.log(`[Thumbnail] Generating PDF thumbnail with ImageMagick: ${pdfPath}`);
 
   try {
+    // Find ImageMagick executable
+    const magickPath = findImageMagick();
+    if (!magickPath) {
+      console.warn('[Thumbnail] ImageMagick not found, falling back to PDF.js');
+      return await generatePDFThumbnailWithPdfJs(pdfPath, width);
+    }
+
     // Get temp directory
     const userDataPath = app.getPath('userData');
     const tempDir = path.join(userDataPath, 'temp-thumbnails');
@@ -147,7 +194,7 @@ async function generatePDFThumbnailInternal(
     // [0]: only convert first page
     // -resize: scale to desired dimensions
     // -quality: compression quality
-    const command = `magick -density 200 "${pdfPath}[0]" -resize ${width}x${height} -quality 90 "${outputPath}"`;
+    const command = `"${magickPath}" -density 200 "${pdfPath}[0]" -resize ${width}x${height} -quality 90 "${outputPath}"`;
     
     console.log(`[Thumbnail] Executing: ${command}`);
     
