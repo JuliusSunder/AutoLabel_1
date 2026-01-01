@@ -10,6 +10,7 @@
     "fresh": "npm run clean && npm run start",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "start:production": "cross-env WEBSITE_URL=https://autolabel.app VITE_WEBSITE_URL=https://autolabel.app electron-forge start",
     "make:signed": "cross-env NODE_ENV=production electron-forge make",
     "package:signed": "cross-env NODE_ENV=production electron-forge package",
     "publish": "electron-forge publish",

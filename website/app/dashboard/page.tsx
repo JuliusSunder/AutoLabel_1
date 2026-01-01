@@ -6,12 +6,13 @@ import { signOut } from "next-auth/react";
 import { Container } from "@/app/components/ui/Container";
 import { Button } from "@/app/components/ui/Button";
 import { BackButton } from "@/app/components/ui/BackButton";
-import { Download, Key, CreditCard, LogOut, Copy, Check, TrendingUp } from "lucide-react";
+import { Download, Key, CreditCard, LogOut, Copy, Check, TrendingUp, Lock } from "lucide-react";
 
 interface UserData {
   id: string;
   email: string;
   name: string | null;
+  hasPassword: boolean;
   subscription: {
     plan: string;
     status: string;
@@ -32,6 +33,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
     fetchUserData();
@@ -120,6 +125,51 @@ export default function DashboardPage() {
       alert("An error occurred: " + (error instanceof Error ? error.message : String(error)));
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+
+    // Validate password
+    if (password.length < 8) {
+      setPasswordError("Passwort muss mindestens 8 Zeichen lang sein");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setPasswordError("Passwörter stimmen nicht überein");
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      const response = await fetch("/api/auth/set-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setPasswordError(data.error || "Fehler beim Setzen des Passworts");
+        return;
+      }
+
+      alert("Passwort erfolgreich gesetzt! Sie können sich jetzt in der Desktop-App anmelden.");
+      // Reload user data
+      await fetchUserData();
+      setPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      console.error("Set password error:", error);
+      setPasswordError("Ein Fehler ist aufgetreten");
+    } finally {
+      setSettingPassword(false);
     }
   };
 
@@ -349,11 +399,69 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Password Set Card - Nur für OAuth User ohne Passwort */}
+          {!userData.hasPassword && (
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl shadow-xl p-8 text-white mb-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Lock className="w-6 h-6" />
+                <h2 className="text-2xl font-bold">Desktop-App Passwort setzen</h2>
+              </div>
+              <p className="mb-6 text-orange-100">
+                Sie haben sich mit Google angemeldet. Um die Desktop-App zu nutzen, müssen Sie ein Passwort setzen.
+              </p>
+              <form onSubmit={handleSetPassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Neues Passwort (mindestens 8 Zeichen)
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-white"
+                    placeholder="Passwort eingeben"
+                    disabled={settingPassword}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Passwort bestätigen
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-white"
+                    placeholder="Passwort wiederholen"
+                    disabled={settingPassword}
+                    required
+                  />
+                </div>
+                {passwordError && (
+                  <p className="text-sm text-red-200 bg-red-900/30 p-3 rounded-lg">
+                    {passwordError}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={settingPassword}
+                  className="w-full px-6 py-3 bg-white text-orange-600 font-medium rounded-lg hover:bg-orange-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-orange-600 disabled:opacity-50"
+                >
+                  {settingPassword ? "Wird gesetzt..." : "Passwort setzen"}
+                </button>
+              </form>
+              <p className="mt-4 text-sm text-orange-100">
+                💡 Nach dem Setzen können Sie sich in der Desktop-App mit Ihrer E-Mail ({userData.email}) und diesem Passwort anmelden.
+              </p>
+            </div>
+          )}
+
           {/* Download Card - Für alle User */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-xl p-8 text-white">
             <div className="flex items-center gap-3 mb-4">
               <Download className="w-6 h-6" />
-              <h2 className="text-2xl font-bold">Download AutoLabel</h2>
+              <h2 className="text-2xl font-bold">AutoLabel Desktop App</h2>
             </div>
             <p className="mb-6 text-blue-100">
               {planName === "free" 
@@ -362,14 +470,24 @@ export default function DashboardPage() {
             </p>
             <button
               onClick={handleDownload}
-              className="inline-flex items-center justify-center px-6 py-3 bg-white text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-600"
+              className="inline-flex items-center justify-center px-6 py-3 bg-white text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 shadow-lg"
             >
               <Download className="w-5 h-5 mr-2" />
-              Download Now
+              Download App
             </button>
             {planName === "free" && (
               <p className="mt-4 text-sm text-blue-200">
                 Note: No license key is required for the Free plan.
+              </p>
+            )}
+            {!userData.hasPassword && (
+              <p className="mt-3 text-sm text-blue-200">
+                ⚠️ Bitte setzen Sie zuerst ein Passwort (siehe oben), um sich in der Desktop-App anmelden zu können.
+              </p>
+            )}
+            {userData.hasPassword && (
+              <p className="mt-3 text-sm text-blue-200">
+                💡 Melden Sie sich in der Desktop-App mit Ihrer E-Mail ({userData.email}) und Ihrem Passwort an.
               </p>
             )}
           </div>

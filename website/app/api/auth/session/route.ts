@@ -17,6 +17,7 @@ export async function GET() {
         id: true,
         email: true,
         name: true,
+        password: true,
         subscriptions: {
           where: { status: "active" },
           orderBy: { createdAt: "desc" },
@@ -40,6 +41,7 @@ export async function GET() {
           id: user.id,
           email: user.email,
           name: user.name,
+          hasPassword: !!user.password,
           subscription: user.subscriptions[0] || null,
           license: user.licenses[0] || null,
         },
