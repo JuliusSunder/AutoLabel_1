@@ -78,17 +78,26 @@ function LoginForm() {
         redirect: false,
       });
 
+      console.log("[Login] Sign-in result:", result);
+
       if (result?.error) {
         if (result.error === "EMAIL_NOT_VERIFIED") {
           setError("Please verify your email address before signing in. Check your inbox for the verification link.");
-        } else {
+        } else if (result.error === "CredentialsSignin") {
           setError("Invalid email or password");
+        } else {
+          setError(`Sign-in failed: ${result.error}`);
         }
-      } else {
+      } else if (result?.ok) {
+        // Wait a bit for session to be established
+        await new Promise(resolve => setTimeout(resolve, 500));
         router.push("/dashboard");
         router.refresh();
+      } else {
+        setError("An unexpected error occurred. Please try again.");
       }
     } catch (err) {
+      console.error("[Login] Sign-in error:", err);
       setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
@@ -194,7 +203,10 @@ function LoginForm() {
             </div>
 
             <button
-              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+              onClick={() => {
+                console.log("[Login] Google sign-in initiated");
+                signIn("google", { callbackUrl: "/dashboard" });
+              }}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

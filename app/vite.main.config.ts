@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import 'dotenv/config';
 
 // https://vitejs.dev/config
 export default defineConfig({
@@ -16,5 +17,11 @@ export default defineConfig({
         // electron-store is bundled (no native dependencies)
       ],
     },
+  },
+  define: {
+    // Make environment variables available in main process
+    'process.env.WEBSITE_URL': JSON.stringify(
+      process.env.WEBSITE_URL || process.env.VITE_WEBSITE_URL || 'http://localhost:3000'
+    ),
   },
 });

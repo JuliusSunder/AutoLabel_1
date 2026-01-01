@@ -155,7 +155,10 @@ export default function RegisterPage() {
             </div>
 
             <button
-              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+              onClick={() => {
+                console.log("[Register] Google sign-up initiated");
+                signIn("google", { callbackUrl: "/dashboard" });
+              }}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

@@ -1,7 +1,7 @@
 {
   "name": "autolabel",
   "productName": "AutoLabel",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Automated shipping label management for resellers",
   "main": ".vite/build/main.js",
   "scripts": {

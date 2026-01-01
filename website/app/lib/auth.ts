@@ -69,63 +69,123 @@ export const authConfig: NextAuthConfig = {
     error: "/login",
   },
   callbacks: {
-    async signIn({ user, account }) {
-      // For OAuth providers, automatically verify email
-      if (account?.provider === "google") {
-        if (user.email) {
-          await prisma.user.update({
-            where: { email: user.email },
-            data: { emailVerified: new Date() },
-          });
+    async signIn({ user, account, profile }) {
+      try {
+        // For OAuth providers, automatically verify email
+        if (account?.provider === "google") {
+          console.log("[Auth] Google OAuth sign-in attempt", { email: user.email });
+          
+          if (user.email) {
+            // Check if user exists first
+            const existingUser = await prisma.user.findUnique({
+              where: { email: user.email },
+            });
+
+            if (existingUser) {
+              // Update existing user to verify email
+              await prisma.user.update({
+                where: { email: user.email },
+                data: { emailVerified: new Date() },
+              });
+              console.log("[Auth] Verified existing Google user", { email: user.email });
+            } else {
+              // For new users, the adapter will create them
+              // Email will be verified in the createUser event
+              console.log("[Auth] New Google user will be created", { email: user.email });
+            }
+          }
+          return true;
         }
-        return true;
-      }
-      
-      // For credentials, check email verification
-      if (account?.provider === "credentials") {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: user.email! },
-        });
         
-        if (!dbUser?.emailVerified) {
-          return "/login?error=verify-email";
+        // For credentials, the email verification is already checked in authorize()
+        // No need to check again here to avoid race conditions
+        if (account?.provider === "credentials") {
+          console.log("[Auth] Credentials sign-in successful", { email: user.email });
+          return true;
         }
+        
+        return true;
+      } catch (error) {
+        console.error("[Auth] Sign-in callback error:", error);
+        // Return false to prevent sign-in on error
+        return false;
       }
-      
-      return true;
     },
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id;
-        token.emailVerified = user.emailVerified;
+    async jwt({ token, user, account, trigger }) {
+      try {
+        // On initial sign-in, user object is available
+        if (user) {
+          token.id = user.id;
+          token.emailVerified = user.emailVerified;
+          console.log("[Auth] JWT created", { userId: user.id, email: user.email });
+        }
+        
+        // On subsequent requests, fetch fresh user data if needed
+        if (trigger === "update") {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+          });
+          if (dbUser) {
+            token.emailVerified = dbUser.emailVerified;
+          }
+        }
+        
+        return token;
+      } catch (error) {
+        console.error("[Auth] JWT callback error:", error);
+        return token;
       }
-      return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.emailVerified = token.emailVerified as Date | null;
+      try {
+        if (session.user && token) {
+          session.user.id = token.id as string;
+          session.user.emailVerified = token.emailVerified as Date | null;
+        }
+        return session;
+      } catch (error) {
+        console.error("[Auth] Session callback error:", error);
+        return session;
       }
-      return session;
     },
   },
   events: {
     async createUser({ user }) {
-      // Create free subscription for new users
-      await prisma.subscription.create({
-        data: {
-          userId: user.id,
-          stripeCustomerId: null,
-          status: "active",
-          plan: "free",
-        },
-      });
+      try {
+        console.log("[Auth] Creating new user", { email: user.email });
+        
+        // Create free subscription for new users
+        await prisma.subscription.create({
+          data: {
+            userId: user.id,
+            stripeCustomerId: null,
+            status: "active",
+            plan: "free",
+          },
+        });
+        
+        // For OAuth users, automatically verify email
+        // This handles the case where the user is created via OAuth
+        if (user.email && !user.emailVerified) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { emailVerified: new Date() },
+          });
+          console.log("[Auth] Auto-verified OAuth user email", { email: user.email });
+        }
+        
+        console.log("[Auth] User created successfully", { userId: user.id });
+      } catch (error) {
+        console.error("[Auth] Create user event error:", error);
+        // Don't throw - let the user be created even if subscription fails
+      }
     },
   },
   session: {
     strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
