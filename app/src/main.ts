@@ -5,6 +5,7 @@ import { autoUpdater } from 'electron-updater';
 import { getDatabase, closeDatabase } from './main/database/db';
 import { registerAllHandlers } from './main/ipc/handlers';
 import { logError, logInfo, logWarning, clearOldLogs, initializeLoggerExplicit } from './main/utils/logger';
+import { setMainWindow } from './main/utils/renderer-logger';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -144,6 +145,9 @@ const createWindow = () => {
     },
   });
 
+  // Register main window for renderer logging
+  setMainWindow(mainWindow);
+
   // Handle renderer process crashes
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('[Main] Renderer process crashed:', details);
@@ -198,6 +202,11 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+// Clean up main window reference on window close
+app.on('window-all-closed', () => {
+  setMainWindow(null);
 });
 
 // In this file you can include the rest of your app's specific main process

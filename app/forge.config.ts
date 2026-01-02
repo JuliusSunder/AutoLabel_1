@@ -17,13 +17,15 @@ const config: ForgeConfig = {
     icon: './icons/icon_256x256', // Electron Forge will add .ico/.icns automatically
     appCopyright: 'Copyright © 2025 JuliusSunder',
     appBundleId: 'com.autolabel.app',
-    // Include external tools (SumatraPDF, ImageMagick) as extra resources
+    // Include external tools (SumatraPDF, ImageMagick, Ghostscript) as extra resources
     extraResource: [
       './bin/SumatraPDF',
       './bin/ImageMagick',
+      './bin/Ghostscript',
     ],
     asar: {
       unpack: '**/*.{node,dll,dylib,so,exe}', // Don't pack native modules and executables in ASAR
+      // Note: extraResource files are automatically placed outside ASAR in resources/ folder
     },
     // Ensure native modules are included
     ignore: [
@@ -53,7 +55,6 @@ const config: ForgeConfig = {
       // Für Production: Professionelles Certificate von vertrauenswürdiger CA verwenden
       certificateFile: process.env.WINDOWS_CERT_PATH || undefined,
       certificatePassword: process.env.WINDOWS_CERT_PASSWORD || undefined,
-      signingHashAlgorithms: ['sha256'],
     }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({

@@ -27,6 +27,7 @@ import {
   calculateFitScale,
   calculateCenteredPosition,
 } from '../utils';
+import { logToRenderer, warnToRenderer, errorToRenderer } from '../../utils/renderer-logger';
 
 /**
  * Get temp directory for processed labels
@@ -47,10 +48,16 @@ function getTempDir(): string {
  * Searches in bundled app directory and common installation paths
  */
 function findImageMagick(): string | null {
+  logToRenderer('[Vinted Profile] 🔍 Searching for ImageMagick...');
+  logToRenderer('[Vinted Profile] process.resourcesPath:', process.resourcesPath);
+  logToRenderer('[Vinted Profile] app.getAppPath():', app.getAppPath());
+  logToRenderer('[Vinted Profile] process.cwd():', process.cwd());
+  
   const possiblePaths = [
     // Bundled with app (primary location for packaged builds)
     // IMPORTANT: process.resourcesPath must be checked FIRST for production builds
-    path.join(process.resourcesPath || '', 'bin', 'ImageMagick', 'magick.exe'),
+    // extraResource copies to resources/ImageMagick/ (not resources/bin/ImageMagick/)
+    path.join(process.resourcesPath || '', 'ImageMagick', 'magick.exe'),
     // Development paths (when running from source)
     path.join(app.getAppPath(), 'bin', 'ImageMagick', 'magick.exe'),
     path.join(process.cwd(), 'app', 'bin', 'ImageMagick', 'magick.exe'),
@@ -63,23 +70,142 @@ function findImageMagick(): string | null {
 
   // Check all possible paths
   for (const magickPath of possiblePaths) {
+    logToRenderer(`[Vinted Profile] Checking: ${magickPath}`);
+    
+    // Skip ASAR paths - executables cannot be run from inside ASAR
+    if (magickPath.includes('.asar')) {
+      logToRenderer(`[Vinted Profile] ⚠️ Skipping ASAR path (executables must be unpacked): ${magickPath}`);
+      continue;
+    }
+    
     if (fs.existsSync(magickPath)) {
-      console.debug(`[Vinted Profile] Found ImageMagick at: ${magickPath}`);
+      logToRenderer(`[Vinted Profile] ✅ Found ImageMagick at: ${magickPath}`);
       return magickPath;
+    } else {
+      logToRenderer(`[Vinted Profile] ❌ Not found at: ${magickPath}`);
     }
   }
 
   // Try to find in PATH
   try {
     execSync('where magick.exe', { encoding: 'utf-8', windowsHide: true });
-    console.debug('[Vinted Profile] Found ImageMagick in system PATH');
+    logToRenderer('[Vinted Profile] ✅ Found ImageMagick in system PATH');
     return 'magick.exe';
   } catch {
     // Not in PATH
   }
 
-  console.warn('[Vinted Profile] ImageMagick not found in any standard location');
+  errorToRenderer('[Vinted Profile] ❌ ImageMagick not found in any standard location');
+  errorToRenderer('[Vinted Profile] Searched paths:', possiblePaths);
   return null;
+}
+
+/**
+ * Find Ghostscript executable
+ * Ghostscript is required by ImageMagick for PDF processing
+ * Returns the bin directory path (not the executable itself)
+ */
+function findGhostscript(): string | null {
+  logToRenderer('[Vinted Profile] 🔍 Searching for Ghostscript...');
+  
+  const possiblePaths = [
+    // Bundled with app (primary location for packaged builds)
+    path.join(process.resourcesPath || '', 'Ghostscript', 'bin', 'gswin64c.exe'),
+    // Development paths (when running from source)
+    path.join(app.getAppPath(), 'bin', 'Ghostscript', 'bin', 'gswin64c.exe'),
+    path.join(process.cwd(), 'app', 'bin', 'Ghostscript', 'bin', 'gswin64c.exe'),
+    // System installations (fallback)
+    'C:\\Program Files\\gs\\gs10.06.0\\bin\\gswin64c.exe',
+    'C:\\Program Files\\gs\\gs10.05.0\\bin\\gswin64c.exe',
+    'C:\\Program Files\\gs\\gs10.04.0\\bin\\gswin64c.exe',
+  ];
+
+  for (const gsPath of possiblePaths) {
+    // Skip ASAR paths
+    if (gsPath.includes('.asar')) {
+      continue;
+    }
+    
+    if (fs.existsSync(gsPath)) {
+      const binDir = path.dirname(gsPath);
+      logToRenderer(`[Vinted Profile] ✅ Found Ghostscript at: ${binDir}`);
+      return binDir;
+    }
+  }
+
+  logToRenderer('[Vinted Profile] ⚠️ Ghostscript not found (PDF processing may fail)');
+  return null;
+}
+
+/**
+ * Fix ImageMagick delegates.xml to use correct Ghostscript path
+ * The portable ImageMagick version has @PSDelegate@ placeholder that needs to be replaced
+ * Returns path to the directory containing the fixed config files
+ */
+function fixImageMagickDelegates(gsExePath: string): string | null {
+  try {
+    logToRenderer('[Vinted Profile] 🔧 Fixing ImageMagick delegates.xml...');
+    
+    // Find ImageMagick directory
+    const magickPath = findImageMagick();
+    if (!magickPath) {
+      return null;
+    }
+    
+    const magickDir = path.dirname(magickPath);
+    const originalDelegatesPath = path.join(magickDir, 'delegates.xml');
+    
+    // Check if delegates.xml exists
+    if (!fs.existsSync(originalDelegatesPath)) {
+      logToRenderer('[Vinted Profile] ⚠️ delegates.xml not found at:', originalDelegatesPath);
+      return null;
+    }
+    
+    // Read original delegates.xml
+    let delegatesContent = fs.readFileSync(originalDelegatesPath, 'utf-8');
+    
+    // Check if it needs fixing (contains @PSDelegate@ placeholder)
+    if (!delegatesContent.includes('@PSDelegate@')) {
+      logToRenderer('[Vinted Profile] ✅ delegates.xml already configured correctly');
+      // Return the original ImageMagick directory since no fix is needed
+      return magickDir;
+    }
+    
+    // Replace @PSDelegate@ with actual Ghostscript path
+    // Use forward slashes for XML (ImageMagick handles both)
+    const gsPathForXml = gsExePath.replace(/\\/g, '/');
+    delegatesContent = delegatesContent.replace(/@PSDelegate@/g, gsPathForXml);
+    
+    // Create config directory in temp
+    const tempDir = getTempDir();
+    const configDir = path.join(tempDir, 'magick-config');
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    // Write fixed delegates.xml
+    const fixedDelegatesPath = path.join(configDir, 'delegates.xml');
+    fs.writeFileSync(fixedDelegatesPath, delegatesContent, 'utf-8');
+    logToRenderer('[Vinted Profile] ✅ Fixed delegates.xml saved to:', fixedDelegatesPath);
+    
+    // Copy other essential config files from ImageMagick directory
+    // This ensures ImageMagick can find all its configuration
+    const configFiles = ['policy.xml', 'type.xml', 'colors.xml'];
+    for (const configFile of configFiles) {
+      const srcPath = path.join(magickDir, configFile);
+      const dstPath = path.join(configDir, configFile);
+      if (fs.existsSync(srcPath) && !fs.existsSync(dstPath)) {
+        fs.copyFileSync(srcPath, dstPath);
+        logToRenderer(`[Vinted Profile] Copied ${configFile} to config directory`);
+      }
+    }
+    
+    return configDir;
+    
+  } catch (error) {
+    errorToRenderer('[Vinted Profile] ❌ Failed to fix delegates.xml:', error);
+    return null;
+  }
 }
 
 /**
@@ -144,51 +270,108 @@ async function processDpdPdf(inputPath: string): Promise<string> {
   const newPdfBytes = await newPdf.save();
   fs.writeFileSync(outputPath, newPdfBytes);
 
-  console.log('[Vinted Profile] Saved DPD PDF:', outputPath);
+    logToRenderer('[Vinted Profile] Saved DPD PDF:', outputPath);
   return outputPath;
 }
 
 /**
- * Process Hermes PDF using ImageMagick
- * Command: -gravity North -crop 100%x50%+0+0 -rotate -90 +repage
+ * Process Hermes PDF using Ghostscript + Sharp (direct approach)
+ * Strategy: Use Ghostscript to render PDF to PNG, then crop and rotate with Sharp
  */
 async function processHermesPdf(inputPath: string): Promise<string> {
-  console.log('[Vinted Profile] Processing Hermes PDF with ImageMagick');
+  logToRenderer('[Vinted Profile] 🔄 Processing Hermes PDF with Ghostscript + Sharp');
 
-  // Find ImageMagick executable
-  const magickPath = findImageMagick();
-  if (!magickPath) {
-    throw new Error(
-      'ImageMagick nicht gefunden. Hermes-Labels können nicht verarbeitet werden. ' +
-      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
-    );
+  // Find Ghostscript
+  const gsBinPath = findGhostscript();
+  if (!gsBinPath) {
+    const errorMsg = 'Ghostscript nicht gefunden. Hermes-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie Ghostscript oder kontaktieren Sie den Support.';
+    errorToRenderer('[Vinted Profile] ❌', errorMsg);
+    throw new Error(errorMsg);
+  }
+  
+  const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
+  logToRenderer('[Vinted Profile] Using Ghostscript at:', gsExePath);
+
+  // Set up Ghostscript environment
+  const env = { ...process.env };
+  env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
+  
+  // Set GS_LIB to point to Ghostscript library directory
+  const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
+  if (fs.existsSync(gsLibPath)) {
+    env.GS_LIB = gsLibPath;
+    logToRenderer('[Vinted Profile] Set GS_LIB:', gsLibPath);
   }
 
-  const tempImagePath = path.join(getTempDir(), `hermes_processed_${Date.now()}.png`);
+  const tempPngPath = path.join(getTempDir(), `hermes_gs_${Date.now()}.png`);
   
   try {
-    // Use ImageMagick to: convert PDF -> crop upper half -> rotate -90°
-    const command = `"${magickPath}" -density ${TARGET_DPI} "${inputPath}[0]" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
-    console.log('[Vinted Profile] Executing ImageMagick:', command);
-    execSync(command, { windowsHide: true });
+    // Step 1: Use Ghostscript to render PDF to high-res PNG
+    // -dNOPAUSE -dBATCH: non-interactive mode
+    // -sDEVICE=png16m: 24-bit color PNG
+    // -r300: 300 DPI resolution
+    // -dFirstPage=1 -dLastPage=1: only first page
+    const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r${TARGET_DPI} -dFirstPage=1 -dLastPage=1 -sOutputFile="${tempPngPath}" "${inputPath}"`;
+    logToRenderer('[Vinted Profile] Executing Ghostscript:', gsCommand);
     
-    console.log('[Vinted Profile] ImageMagick processing complete');
+    execSync(gsCommand, { 
+      windowsHide: true,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env
+    });
+    
+    logToRenderer('[Vinted Profile] ✅ Ghostscript rendered PDF to PNG');
 
-    // Resize to target dimensions
+    // Step 2: Load image with Sharp and get dimensions
+    const metadata = await sharp(tempPngPath).metadata();
+    const width = metadata.width || 0;
+    const height = metadata.height || 0;
+    
+    logToRenderer(`[Vinted Profile] Original PNG size: ${width}x${height}px`);
+
+    // Step 3: Crop upper half (North gravity, 100%x50%)
+    const cropHeight = Math.floor(height / 2);
+    const croppedImagePath = path.join(getTempDir(), `hermes_cropped_${Date.now()}.png`);
+    
+    await sharp(tempPngPath)
+      .extract({
+        left: 0,
+        top: 0,
+        width: width,
+        height: cropHeight
+      })
+      .toFile(croppedImagePath);
+    
+    logToRenderer(`[Vinted Profile] Cropped to upper half: ${width}x${cropHeight}px`);
+
+    // Step 4: Rotate -90° (counter-clockwise)
+    const rotatedImagePath = path.join(getTempDir(), `hermes_rotated_${Date.now()}.png`);
+    
+    await sharp(croppedImagePath)
+      .rotate(-90)
+      .toFile(rotatedImagePath);
+    
+    logToRenderer('[Vinted Profile] Rotated -90°');
+
+    // Step 5: Resize to target dimensions
     const targetDimensions = getTargetPixelDimensions();
     const { getContentHeightPixels } = await import('../utils');
     const contentHeight = getContentHeightPixels();
 
     const resizedImagePath = path.join(getTempDir(), `hermes_resized_${Date.now()}.png`);
-    await sharp(tempImagePath)
+    await sharp(rotatedImagePath)
       .resize(targetDimensions.width, contentHeight, {
         fit: 'contain',
         background: { r: 255, g: 255, b: 255, alpha: 1 },
       })
       .png()
       .toFile(resizedImagePath);
+    
+    logToRenderer('[Vinted Profile] Resized to target dimensions');
 
-    // Convert to PDF
+    // Step 6: Convert to PDF
     const targetWidthPoints = (targetDimensions.width * 72) / TARGET_DPI;
     const targetHeightPoints = (contentHeight * 72) / TARGET_DPI;
 
@@ -210,60 +393,136 @@ async function processHermesPdf(inputPath: string): Promise<string> {
     fs.writeFileSync(outputPath, newPdfBytes);
 
     // Cleanup
-    fs.unlinkSync(tempImagePath);
+    fs.unlinkSync(tempPngPath);
+    fs.unlinkSync(croppedImagePath);
+    fs.unlinkSync(rotatedImagePath);
     fs.unlinkSync(resizedImagePath);
 
-    console.log('[Vinted Profile] Saved Hermes PDF:', outputPath);
+    logToRenderer('[Vinted Profile] ✅ Saved Hermes PDF:', outputPath);
     return outputPath;
-  } catch (error) {
-    if (fs.existsSync(tempImagePath)) {
-      fs.unlinkSync(tempImagePath);
+  } catch (error: any) {
+    // Log detailed error information
+    errorToRenderer('[Vinted Profile] ❌ PDF processing failed!');
+    errorToRenderer('[Vinted Profile] Error message:', error.message);
+    
+    if (error.stderr) {
+      errorToRenderer('[Vinted Profile] Stderr:', error.stderr);
     }
-    throw error;
+    if (error.stdout) {
+      logToRenderer('[Vinted Profile] Stdout:', error.stdout);
+    }
+    if (error.status) {
+      errorToRenderer('[Vinted Profile] Exit code:', error.status);
+    }
+    
+    // Cleanup temp files
+    try {
+      if (fs.existsSync(tempPngPath)) fs.unlinkSync(tempPngPath);
+      if (typeof croppedImagePath !== 'undefined' && fs.existsSync(croppedImagePath)) fs.unlinkSync(croppedImagePath);
+      if (typeof rotatedImagePath !== 'undefined' && fs.existsSync(rotatedImagePath)) fs.unlinkSync(rotatedImagePath);
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+    
+    // Re-throw with more context
+    throw new Error(`PDF processing failed: ${error.message}${error.stderr ? '\nStderr: ' + error.stderr : ''}`);
   }
 }
 
 /**
- * Process standard PDF (GLS, DHL) using ImageMagick
- * Command: -gravity North -crop 100%x50%+0+0 -rotate -90 +repage
+ * Process standard PDF (GLS, DHL) using Ghostscript + Sharp (direct approach)
+ * Strategy: Use Ghostscript to render PDF to PNG, then crop and rotate with Sharp
  */
 async function processStandardPdf(inputPath: string): Promise<string> {
-  console.log('[Vinted Profile] Processing standard PDF (GLS/DHL) with ImageMagick');
+  logToRenderer('[Vinted Profile] 🔄 Processing standard PDF (GLS/DHL) with Ghostscript + Sharp');
 
-  // Find ImageMagick executable
-  const magickPath = findImageMagick();
-  if (!magickPath) {
-    throw new Error(
-      'ImageMagick nicht gefunden. GLS/DHL-Labels können nicht verarbeitet werden. ' +
-      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
-    );
+  // Find Ghostscript
+  const gsBinPath = findGhostscript();
+  if (!gsBinPath) {
+    const errorMsg = 'Ghostscript nicht gefunden. GLS/DHL-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie Ghostscript oder kontaktieren Sie den Support.';
+    errorToRenderer('[Vinted Profile] ❌', errorMsg);
+    throw new Error(errorMsg);
+  }
+  
+  const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
+  logToRenderer('[Vinted Profile] Using Ghostscript at:', gsExePath);
+
+  // Set up Ghostscript environment
+  const env = { ...process.env };
+  env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
+  
+  // Set GS_LIB to point to Ghostscript library directory
+  const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
+  if (fs.existsSync(gsLibPath)) {
+    env.GS_LIB = gsLibPath;
+    logToRenderer('[Vinted Profile] Set GS_LIB:', gsLibPath);
   }
 
-  const tempImagePath = path.join(getTempDir(), `standard_processed_${Date.now()}.png`);
+  const tempPngPath = path.join(getTempDir(), `standard_gs_${Date.now()}.png`);
   
   try {
-    // Use ImageMagick to: convert PDF -> crop upper half -> rotate -90°
-    const command = `"${magickPath}" -density ${TARGET_DPI} "${inputPath}[0]" -gravity North -crop 100%x50%+0+0 -rotate -90 +repage "${tempImagePath}"`;
-    console.log('[Vinted Profile] Executing ImageMagick:', command);
-    execSync(command, { windowsHide: true });
+    // Step 1: Use Ghostscript to render PDF to high-res PNG
+    const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r${TARGET_DPI} -dFirstPage=1 -dLastPage=1 -sOutputFile="${tempPngPath}" "${inputPath}"`;
+    logToRenderer('[Vinted Profile] Executing Ghostscript:', gsCommand);
     
-    console.log('[Vinted Profile] ImageMagick processing complete');
+    execSync(gsCommand, { 
+      windowsHide: true,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env
+    });
+    
+    logToRenderer('[Vinted Profile] ✅ Ghostscript rendered PDF to PNG');
 
-    // Resize to target dimensions
+    // Step 2: Load image with Sharp and get dimensions
+    const metadata = await sharp(tempPngPath).metadata();
+    const width = metadata.width || 0;
+    const height = metadata.height || 0;
+    
+    logToRenderer(`[Vinted Profile] Original PNG size: ${width}x${height}px`);
+
+    // Step 3: Crop upper half (North gravity, 100%x50%)
+    const cropHeight = Math.floor(height / 2);
+    const croppedImagePath = path.join(getTempDir(), `standard_cropped_${Date.now()}.png`);
+    
+    await sharp(tempPngPath)
+      .extract({
+        left: 0,
+        top: 0,
+        width: width,
+        height: cropHeight
+      })
+      .toFile(croppedImagePath);
+    
+    logToRenderer(`[Vinted Profile] Cropped to upper half: ${width}x${cropHeight}px`);
+
+    // Step 4: Rotate -90° (counter-clockwise)
+    const rotatedImagePath = path.join(getTempDir(), `standard_rotated_${Date.now()}.png`);
+    
+    await sharp(croppedImagePath)
+      .rotate(-90)
+      .toFile(rotatedImagePath);
+    
+    logToRenderer('[Vinted Profile] Rotated -90°');
+
+    // Step 5: Resize to target dimensions
     const targetDimensions = getTargetPixelDimensions();
     const { getContentHeightPixels } = await import('../utils');
     const contentHeight = getContentHeightPixels();
 
     const resizedImagePath = path.join(getTempDir(), `standard_resized_${Date.now()}.png`);
-    await sharp(tempImagePath)
+    await sharp(rotatedImagePath)
       .resize(targetDimensions.width, contentHeight, {
         fit: 'contain',
         background: { r: 255, g: 255, b: 255, alpha: 1 },
       })
       .png()
       .toFile(resizedImagePath);
+    
+    logToRenderer('[Vinted Profile] Resized to target dimensions');
 
-    // Convert to PDF
+    // Step 6: Convert to PDF
     const targetWidthPoints = (targetDimensions.width * 72) / TARGET_DPI;
     const targetHeightPoints = (contentHeight * 72) / TARGET_DPI;
 
@@ -285,16 +544,39 @@ async function processStandardPdf(inputPath: string): Promise<string> {
     fs.writeFileSync(outputPath, newPdfBytes);
 
     // Cleanup
-    fs.unlinkSync(tempImagePath);
+    fs.unlinkSync(tempPngPath);
+    fs.unlinkSync(croppedImagePath);
+    fs.unlinkSync(rotatedImagePath);
     fs.unlinkSync(resizedImagePath);
 
-    console.log('[Vinted Profile] Saved standard PDF:', outputPath);
+    logToRenderer('[Vinted Profile] ✅ Saved standard PDF:', outputPath);
     return outputPath;
-  } catch (error) {
-    if (fs.existsSync(tempImagePath)) {
-      fs.unlinkSync(tempImagePath);
+  } catch (error: any) {
+    // Log detailed error information
+    errorToRenderer('[Vinted Profile] ❌ PDF processing failed!');
+    errorToRenderer('[Vinted Profile] Error message:', error.message);
+    
+    if (error.stderr) {
+      errorToRenderer('[Vinted Profile] Stderr:', error.stderr);
     }
-    throw error;
+    if (error.stdout) {
+      logToRenderer('[Vinted Profile] Stdout:', error.stdout);
+    }
+    if (error.status) {
+      errorToRenderer('[Vinted Profile] Exit code:', error.status);
+    }
+    
+    // Cleanup temp files
+    try {
+      if (fs.existsSync(tempPngPath)) fs.unlinkSync(tempPngPath);
+      if (typeof croppedImagePath !== 'undefined' && fs.existsSync(croppedImagePath)) fs.unlinkSync(croppedImagePath);
+      if (typeof rotatedImagePath !== 'undefined' && fs.existsSync(rotatedImagePath)) fs.unlinkSync(rotatedImagePath);
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+    
+    // Re-throw with more context
+    throw new Error(`PDF processing failed: ${error.message}${error.stderr ? '\nStderr: ' + error.stderr : ''}`);
   }
 }
 
@@ -346,16 +628,18 @@ async function processDpdImage(inputPath: string): Promise<string> {
  * Command: -gravity North -crop 100%x50%+0+0 -rotate -90 +repage
  */
 async function processHermesImage(inputPath: string): Promise<string> {
-  console.log('[Vinted Profile] Processing Hermes image with ImageMagick');
+  logToRenderer('[Vinted Profile] 🔄 Processing Hermes image with ImageMagick');
 
   // Find ImageMagick executable
   const magickPath = findImageMagick();
   if (!magickPath) {
-    throw new Error(
-      'ImageMagick nicht gefunden. Hermes-Labels können nicht verarbeitet werden. ' +
-      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
-    );
+    const errorMsg = 'ImageMagick nicht gefunden. Hermes-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.';
+    errorToRenderer('[Vinted Profile] ❌', errorMsg);
+    throw new Error(errorMsg);
   }
+  
+  logToRenderer('[Vinted Profile] Using ImageMagick at:', magickPath);
 
   const tempImagePath = path.join(getTempDir(), `hermes_img_processed_${Date.now()}.png`);
   
@@ -384,7 +668,7 @@ async function processHermesImage(inputPath: string): Promise<string> {
     // Cleanup
     fs.unlinkSync(tempImagePath);
 
-    console.log('[Vinted Profile] Saved Hermes image:', outputPath);
+    logToRenderer('[Vinted Profile] Saved Hermes image:', outputPath);
     return outputPath;
   } catch (error) {
     if (fs.existsSync(tempImagePath)) {
@@ -399,16 +683,18 @@ async function processHermesImage(inputPath: string): Promise<string> {
  * Command: -gravity North -crop 100%x50%+0+0 -rotate -90 +repage
  */
 async function processStandardImage(inputPath: string): Promise<string> {
-  console.log('[Vinted Profile] Processing standard image (GLS/DHL) with ImageMagick');
+  logToRenderer('[Vinted Profile] 🔄 Processing standard image (GLS/DHL) with ImageMagick');
 
   // Find ImageMagick executable
   const magickPath = findImageMagick();
   if (!magickPath) {
-    throw new Error(
-      'ImageMagick nicht gefunden. GLS/DHL-Labels können nicht verarbeitet werden. ' +
-      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.'
-    );
+    const errorMsg = 'ImageMagick nicht gefunden. GLS/DHL-Labels können nicht verarbeitet werden. ' +
+      'Bitte installieren Sie ImageMagick oder kontaktieren Sie den Support.';
+    errorToRenderer('[Vinted Profile] ❌', errorMsg);
+    throw new Error(errorMsg);
   }
+  
+  logToRenderer('[Vinted Profile] Using ImageMagick at:', magickPath);
 
   const tempImagePath = path.join(getTempDir(), `standard_img_processed_${Date.now()}.png`);
   
@@ -437,7 +723,7 @@ async function processStandardImage(inputPath: string): Promise<string> {
     // Cleanup
     fs.unlinkSync(tempImagePath);
 
-    console.log('[Vinted Profile] Saved standard image:', outputPath);
+    logToRenderer('[Vinted Profile] Saved standard image:', outputPath);
     return outputPath;
   } catch (error) {
     if (fs.existsSync(tempImagePath)) {
@@ -486,7 +772,7 @@ export const vintedProfile: LabelProfile = {
     height: number;
   }> {
     const shippingCompany = context?.shippingCompany || '';
-    console.log(`[Vinted Profile] Processing label for: ${shippingCompany}`);
+    logToRenderer(`[Vinted Profile] Processing label for: ${shippingCompany}`);
     
     const ext = path.extname(filePath).toLowerCase();
     let outputPath: string;

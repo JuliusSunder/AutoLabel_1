@@ -12,6 +12,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { Canvas, createCanvas } from 'canvas';
+import { logToRenderer, warnToRenderer, errorToRenderer } from '../utils/renderer-logger';
 
 const execAsync = promisify(exec);
 
@@ -20,39 +21,163 @@ const execAsync = promisify(exec);
  * Searches in bundled app directory and common installation paths
  */
 function findImageMagick(): string | null {
+  logToRenderer('[Thumbnail] 🔍 Searching for ImageMagick...');
+  logToRenderer('[Thumbnail] process.resourcesPath:', process.resourcesPath);
+  logToRenderer('[Thumbnail] app.getAppPath():', app.getAppPath());
+  logToRenderer('[Thumbnail] process.cwd():', process.cwd());
+  
   const possiblePaths = [
     // Bundled with app (primary location for packaged builds)
-    path.join(process.resourcesPath || '', 'bin', 'ImageMagick', 'magick.exe'),
+    // extraResource copies to resources/ImageMagick/ (not resources/bin/ImageMagick/)
+    path.join(process.resourcesPath || '', 'ImageMagick', 'magick.exe'),
+    // Development paths (when running from source)
     path.join(app.getAppPath(), 'bin', 'ImageMagick', 'magick.exe'),
     path.join(process.cwd(), 'app', 'bin', 'ImageMagick', 'magick.exe'),
-    // System installations
+    // System installations (fallback)
     'C:\\Program Files\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe',
     'C:\\Program Files\\ImageMagick-7.1.0-Q16-HDRI\\magick.exe',
     'C:\\Program Files (x86)\\ImageMagick-7.1.1-Q16-HDRI\\magick.exe',
     'C:\\Program Files (x86)\\ImageMagick-7.1.0-Q16-HDRI\\magick.exe',
   ];
 
-  console.debug('[Thumbnail] Searching for ImageMagick...');
   for (const magickPath of possiblePaths) {
-    console.debug(`[Thumbnail] Checking: ${magickPath}`);
+    logToRenderer(`[Thumbnail] Checking: ${magickPath}`);
+    
+    // Skip ASAR paths - executables cannot be run from inside ASAR
+    if (magickPath.includes('.asar')) {
+      logToRenderer(`[Thumbnail] ⚠️ Skipping ASAR path (executables must be unpacked): ${magickPath}`);
+      continue;
+    }
+    
     if (fs.existsSync(magickPath)) {
-      console.log(`[Thumbnail] ✓ Found ImageMagick at: ${magickPath}`);
+      logToRenderer(`[Thumbnail] ✅ Found ImageMagick at: ${magickPath}`);
       return magickPath;
+    } else {
+      logToRenderer(`[Thumbnail] ❌ Not found at: ${magickPath}`);
     }
   }
 
   // Try to find in PATH
   try {
     execSync('where magick.exe', { encoding: 'utf-8', windowsHide: true });
-    console.log('[Thumbnail] ✓ Found ImageMagick in system PATH');
+    logToRenderer('[Thumbnail] ✅ Found ImageMagick in system PATH');
     return 'magick.exe';
   } catch {
     // Not in PATH
   }
 
-  console.warn('[Thumbnail] ⚠ ImageMagick not found in any location');
-  console.warn('[Thumbnail] Searched paths:', possiblePaths);
+  errorToRenderer('[Thumbnail] ❌ ImageMagick not found in any location');
+  errorToRenderer('[Thumbnail] Searched paths:', possiblePaths);
   return null;
+}
+
+/**
+ * Find Ghostscript executable
+ * Ghostscript is required by ImageMagick for PDF processing
+ * Returns the bin directory path (not the executable itself)
+ */
+function findGhostscript(): string | null {
+  logToRenderer('[Thumbnail] 🔍 Searching for Ghostscript...');
+  
+  const possiblePaths = [
+    // Bundled with app (primary location for packaged builds)
+    path.join(process.resourcesPath || '', 'Ghostscript', 'bin', 'gswin64c.exe'),
+    // Development paths (when running from source)
+    path.join(app.getAppPath(), 'bin', 'Ghostscript', 'bin', 'gswin64c.exe'),
+    path.join(process.cwd(), 'app', 'bin', 'Ghostscript', 'bin', 'gswin64c.exe'),
+    // System installations (fallback)
+    'C:\\Program Files\\gs\\gs10.06.0\\bin\\gswin64c.exe',
+    'C:\\Program Files\\gs\\gs10.05.0\\bin\\gswin64c.exe',
+    'C:\\Program Files\\gs\\gs10.04.0\\bin\\gswin64c.exe',
+  ];
+
+  for (const gsPath of possiblePaths) {
+    // Skip ASAR paths
+    if (gsPath.includes('.asar')) {
+      continue;
+    }
+    
+    if (fs.existsSync(gsPath)) {
+      const binDir = path.dirname(gsPath);
+      logToRenderer(`[Thumbnail] ✅ Found Ghostscript at: ${binDir}`);
+      return binDir;
+    }
+  }
+
+  logToRenderer('[Thumbnail] ⚠️ Ghostscript not found (PDF processing may fail)');
+  return null;
+}
+
+/**
+ * Fix ImageMagick delegates.xml to use correct Ghostscript path
+ * The portable ImageMagick version has @PSDelegate@ placeholder that needs to be replaced
+ * Returns path to the directory containing the fixed config files
+ */
+function fixImageMagickDelegates(gsExePath: string): string | null {
+  try {
+    logToRenderer('[Thumbnail] 🔧 Fixing ImageMagick delegates.xml...');
+    
+    // Find ImageMagick directory
+    const magickPath = findImageMagick();
+    if (!magickPath) {
+      return null;
+    }
+    
+    const magickDir = path.dirname(magickPath);
+    const originalDelegatesPath = path.join(magickDir, 'delegates.xml');
+    
+    // Check if delegates.xml exists
+    if (!fs.existsSync(originalDelegatesPath)) {
+      logToRenderer('[Thumbnail] ⚠️ delegates.xml not found at:', originalDelegatesPath);
+      return null;
+    }
+    
+    // Read original delegates.xml
+    let delegatesContent = fs.readFileSync(originalDelegatesPath, 'utf-8');
+    
+    // Check if it needs fixing (contains @PSDelegate@ placeholder)
+    if (!delegatesContent.includes('@PSDelegate@')) {
+      logToRenderer('[Thumbnail] ✅ delegates.xml already configured correctly');
+      // Return the original ImageMagick directory since no fix is needed
+      return magickDir;
+    }
+    
+    // Replace @PSDelegate@ with actual Ghostscript path
+    // Use forward slashes for XML (ImageMagick handles both)
+    const gsPathForXml = gsExePath.replace(/\\/g, '/');
+    delegatesContent = delegatesContent.replace(/@PSDelegate@/g, gsPathForXml);
+    
+    // Create config directory in temp
+    const userDataPath = app.getPath('userData');
+    const tempDir = path.join(userDataPath, 'temp-thumbnails');
+    const configDir = path.join(tempDir, 'magick-config');
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    // Write fixed delegates.xml
+    const fixedDelegatesPath = path.join(configDir, 'delegates.xml');
+    fs.writeFileSync(fixedDelegatesPath, delegatesContent, 'utf-8');
+    logToRenderer('[Thumbnail] ✅ Fixed delegates.xml saved to:', fixedDelegatesPath);
+    
+    // Copy other essential config files from ImageMagick directory
+    // This ensures ImageMagick can find all its configuration
+    const configFiles = ['policy.xml', 'type.xml', 'colors.xml'];
+    for (const configFile of configFiles) {
+      const srcPath = path.join(magickDir, configFile);
+      const dstPath = path.join(configDir, configFile);
+      if (fs.existsSync(srcPath) && !fs.existsSync(dstPath)) {
+        fs.copyFileSync(srcPath, dstPath);
+        logToRenderer(`[Thumbnail] Copied ${configFile} to config directory`);
+      }
+    }
+    
+    return configDir;
+    
+  } catch (error) {
+    errorToRenderer('[Thumbnail] ❌ Failed to fix delegates.xml:', error);
+    return null;
+  }
 }
 
 // Configure PDF.js to work in Node.js environment
@@ -154,21 +279,35 @@ async function generateImageThumbnail(
 }
 
 /**
- * Generate thumbnail from a PDF file using ImageMagick directly
+ * Generate thumbnail from a PDF file using Ghostscript directly
  * Renders actual PDF content to image
  */
 async function generatePDFThumbnailInternal(
   pdfPath: string,
   width: number
 ): Promise<string> {
-  console.log(`[Thumbnail] Generating PDF thumbnail with ImageMagick: ${pdfPath}`);
+  logToRenderer(`[Thumbnail] 🖼️ Generating PDF thumbnail with Ghostscript: ${pdfPath}`);
 
   try {
-    // Find ImageMagick executable
-    const magickPath = findImageMagick();
-    if (!magickPath) {
-      console.warn('[Thumbnail] ImageMagick not found, falling back to PDF.js');
+    // Find Ghostscript
+    const gsBinPath = findGhostscript();
+    if (!gsBinPath) {
+      warnToRenderer('[Thumbnail] ⚠️ Ghostscript not found, falling back to PDF.js');
       return await generatePDFThumbnailWithPdfJs(pdfPath, width);
+    }
+    
+    const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
+    logToRenderer('[Thumbnail] Using Ghostscript at:', gsExePath);
+
+    // Set up Ghostscript environment
+    const env = { ...process.env };
+    env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
+    
+    // Set GS_LIB to point to Ghostscript library directory
+    const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
+    if (fs.existsSync(gsLibPath)) {
+      env.GS_LIB = gsLibPath;
+      logToRenderer('[Thumbnail] Set GS_LIB:', gsLibPath);
     }
 
     // Get temp directory
@@ -187,57 +326,79 @@ async function generatePDFThumbnailInternal(
     // Calculate height (2:3 aspect ratio)
     const height = Math.floor(width * 1.5);
 
-    console.log(`[Thumbnail] Converting first page of PDF to ${width}x${height} PNG...`);
+    logToRenderer(`[Thumbnail] Converting first page of PDF to ${width}x${height} PNG...`);
 
-    // Use ImageMagick to convert PDF to PNG
-    // -density: resolution for rendering (higher = better quality)
-    // [0]: only convert first page
-    // -resize: scale to desired dimensions
-    // -quality: compression quality
-    const command = `"${magickPath}" -density 200 "${pdfPath}[0]" -resize ${width}x${height} -quality 90 "${outputPath}"`;
+    // Use Ghostscript to convert PDF to PNG
+    // -dNOPAUSE -dBATCH: non-interactive mode
+    // -sDEVICE=png16m: 24-bit color PNG
+    // -r200: 200 DPI resolution (good for thumbnails)
+    // -dFirstPage=1 -dLastPage=1: only first page
+    const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r200 -dFirstPage=1 -dLastPage=1 -sOutputFile="${outputPath}" "${pdfPath}"`;
     
-    console.log(`[Thumbnail] Executing: ${command}`);
+    logToRenderer(`[Thumbnail] Executing: ${gsCommand}`);
     
-    // Execute ImageMagick command
-    const { stdout, stderr } = await execAsync(command);
+    // Execute Ghostscript command
+    const { stdout, stderr } = await execAsync(gsCommand, { windowsHide: true, env });
     
-    if (stderr && !stderr.includes('Warning')) {
-      console.warn(`[Thumbnail] ImageMagick stderr: ${stderr}`);
+    if (stdout) {
+      logToRenderer(`[Thumbnail] Ghostscript stdout: ${stdout}`);
     }
     
-    console.log(`[Thumbnail] PDF converted, checking output file: ${outputPath}`);
+    if (stderr) {
+      // Ghostscript writes info to stderr even on success
+      logToRenderer(`[Thumbnail] Ghostscript stderr: ${stderr}`);
+    }
+    
+    logToRenderer(`[Thumbnail] PDF converted, checking output file: ${outputPath}`);
 
     // Verify the output file exists
     if (!fs.existsSync(outputPath)) {
-      throw new Error('ImageMagick did not produce output file');
+      throw new Error('Ghostscript did not produce output file');
     }
 
-    // Read the generated PNG file
-    const imageBuffer = fs.readFileSync(outputPath);
-    const base64Data = imageBuffer.toString('base64');
+    // Resize to exact dimensions using Sharp
+    const resizedBuffer = await sharp(outputPath)
+      .resize(width, height, {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .png({ quality: 90, compressionLevel: 9 })
+      .toBuffer();
+
+    const base64Data = resizedBuffer.toString('base64');
     
-    console.log(`[Thumbnail] Image file read, base64 length: ${base64Data.length}`);
+    logToRenderer(`[Thumbnail] Image resized, base64 length: ${base64Data.length}`);
     
     // Clean up temp file
     try {
       fs.unlinkSync(outputPath);
-      console.log(`[Thumbnail] Cleaned up temp file: ${outputPath}`);
+      logToRenderer(`[Thumbnail] Cleaned up temp file: ${outputPath}`);
     } catch (cleanupError) {
-      console.warn('[Thumbnail] Failed to cleanup temp file:', cleanupError);
+      warnToRenderer('[Thumbnail] Failed to cleanup temp file:', cleanupError);
     }
 
     // Return as data URL
     const dataUrl = `data:image/png;base64,${base64Data}`;
 
-    console.log(`[Thumbnail] ✅ PDF thumbnail generated successfully (data URL length: ${dataUrl.length})`);
+    logToRenderer(`[Thumbnail] ✅ PDF thumbnail generated successfully (data URL length: ${dataUrl.length})`);
     return dataUrl;
 
-  } catch (error) {
-    console.error('[Thumbnail] Failed to generate PDF thumbnail with ImageMagick:', error);
-    console.error('[Thumbnail] Make sure ImageMagick is installed and "magick" command is in PATH');
+  } catch (error: any) {
+    errorToRenderer('[Thumbnail] ❌ Failed to generate PDF thumbnail with Ghostscript');
+    errorToRenderer('[Thumbnail] Error message:', error.message);
+    
+    if (error.stderr) {
+      errorToRenderer('[Thumbnail] Stderr:', error.stderr);
+    }
+    if (error.stdout) {
+      logToRenderer('[Thumbnail] Stdout:', error.stdout);
+    }
+    if (error.code) {
+      errorToRenderer('[Thumbnail] Exit code:', error.code);
+    }
     
     // Fallback to PDF.js renderer
-    console.log('[Thumbnail] Trying PDF.js fallback renderer...');
+    logToRenderer('[Thumbnail] Trying PDF.js fallback renderer...');
     return await generatePDFThumbnailWithPdfJs(pdfPath, width);
   }
 }

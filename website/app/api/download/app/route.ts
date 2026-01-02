@@ -39,15 +39,33 @@ export async function GET(req: NextRequest) {
 
     // Get plan from subscription (fallback to "free")
     const plan = user.subscriptions[0]?.plan || "free";
-    const license = user.licenses[0] || null;
+    let license = user.licenses[0] || null;
 
     // Premium users need a valid license
     if (plan !== "free") {
+      // Auto-create license if missing (for manual subscription changes via Prisma Studio)
       if (!license) {
-        return NextResponse.json(
-          { error: "Keine gültige Lizenz gefunden. Bitte kontaktieren Sie den Support." },
-          { status: 403 }
-        );
+        console.log(`[Download API] Premium subscription found without license for user ${user.id} (plan: ${plan})`);
+        console.log(`[Download API] Auto-creating license for user ${user.id}`);
+        
+        try {
+          license = await prisma.license.create({
+            data: {
+              userId: user.id,
+              status: "active",
+              plan: plan,
+              expiresAt: user.subscriptions[0]?.currentPeriodEnd || null,
+            },
+          });
+          
+          console.log(`[Download API] ✓ Successfully created license ${license.licenseKey} for user ${user.id}`);
+        } catch (createError) {
+          console.error(`[Download API] Failed to create license for user ${user.id}:`, createError);
+          return NextResponse.json(
+            { error: "Keine gültige Lizenz gefunden. Bitte kontaktieren Sie den Support." },
+            { status: 403 }
+          );
+        }
       }
 
       // Check if license is expired

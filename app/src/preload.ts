@@ -72,3 +72,26 @@ const autolabelAPI: AutoLabelAPI = {
 
 // Expose to window object
 contextBridge.exposeInMainWorld('autolabel', autolabelAPI);
+
+// Listen for main process logs and forward to console
+ipcRenderer.on('main-process-log', (event, { level, args }) => {
+  // Deserialize arguments
+  const deserializedArgs = args.map((arg: any) => {
+    if (arg && arg.__type === 'Error') {
+      const error = new Error(arg.message);
+      error.name = arg.name;
+      error.stack = arg.stack;
+      return error;
+    }
+    return arg;
+  });
+
+  // Forward to browser console
+  if (level === 'log') {
+    console.log('[Main]', ...deserializedArgs);
+  } else if (level === 'warn') {
+    console.warn('[Main]', ...deserializedArgs);
+  } else if (level === 'error') {
+    console.error('[Main]', ...deserializedArgs);
+  }
+});
