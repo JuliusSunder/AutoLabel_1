@@ -30,6 +30,32 @@ import {
 import { logToRenderer, warnToRenderer, errorToRenderer } from '../../utils/renderer-logger';
 
 /**
+ * Node.js Canvas Factory for PDF.js
+ * Provides a canvas implementation that works in Node.js environment
+ */
+const NodeCanvasFactory = {
+  create(width: number, height: number) {
+    // Dynamic import to avoid issues if canvas is not available
+    const { createCanvas } = require('canvas');
+    const canvas = createCanvas(width, height);
+    return {
+      canvas,
+      context: canvas.getContext('2d'),
+    };
+  },
+  reset(canvasAndContext: any, width: number, height: number) {
+    canvasAndContext.canvas.width = width;
+    canvasAndContext.canvas.height = height;
+  },
+  destroy(canvasAndContext: any) {
+    canvasAndContext.canvas.width = 0;
+    canvasAndContext.canvas.height = 0;
+    canvasAndContext.canvas = null;
+    canvasAndContext.context = null;
+  },
+};
+
+/**
  * Get temp directory for processed labels
  */
 function getTempDir(): string {
@@ -135,6 +161,31 @@ function findGhostscript(): string | null {
 
   logToRenderer('[Vinted Profile] ⚠️ Ghostscript not found (PDF processing may fail)');
   return null;
+}
+
+/**
+ * Verify Ghostscript installation by checking for required files
+ * Returns true if all required files exist
+ */
+function verifyGhostscriptInstallation(gsBinPath: string): boolean {
+  const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
+  const gsDllPath = path.join(gsBinPath, 'gsdll64.dll');
+  
+  if (!fs.existsSync(gsExePath)) {
+    errorToRenderer('[Vinted Profile] ❌ gswin64c.exe not found at:', gsExePath);
+    return false;
+  }
+  
+  if (!fs.existsSync(gsDllPath)) {
+    errorToRenderer('[Vinted Profile] ❌ gsdll64.dll not found at:', gsDllPath);
+    return false;
+  }
+  
+  logToRenderer('[Vinted Profile] ✅ Ghostscript installation verified');
+  logToRenderer('[Vinted Profile] - gswin64c.exe:', gsExePath);
+  logToRenderer('[Vinted Profile] - gsdll64.dll:', gsDllPath);
+  
+  return true;
 }
 
 /**
@@ -275,54 +326,165 @@ async function processDpdPdf(inputPath: string): Promise<string> {
 }
 
 /**
+ * Render PDF to PNG using PDF.js (pure JavaScript, no external binaries)
+ * Returns path to rendered PNG file
+ */
+async function renderPdfToPngWithPdfJs(
+  pdfPath: string,
+  outputPngPath: string,
+  dpi: number = 300
+): Promise<void> {
+  logToRenderer('[Vinted Profile] Rendering PDF to PNG with PDF.js...');
+  
+  try {
+    // Import PDF.js
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    
+    // Read PDF file
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    const pdfData = new Uint8Array(pdfBuffer);
+    
+    // Load PDF document
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfData,
+      useSystemFonts: true,
+      disableFontFace: false,
+    });
+    
+    const pdfDocument = await loadingTask.promise;
+    logToRenderer(`[Vinted Profile] PDF.js loaded document with ${pdfDocument.numPages} pages`);
+    
+    // Get first page
+    const page = await pdfDocument.getPage(1);
+    const viewport = page.getViewport({ scale: 1.0 });
+    
+    // Calculate scale for desired DPI
+    // PDF.js viewport is in 72 DPI, so scale = desiredDPI / 72
+    const scale = dpi / 72;
+    const scaledViewport = page.getViewport({ scale });
+    
+    logToRenderer(`[Vinted Profile] Rendering at ${dpi} DPI, scale: ${scale}, size: ${Math.floor(scaledViewport.width)}x${Math.floor(scaledViewport.height)}`);
+    
+    // Create canvas using NodeCanvasFactory
+    const canvasFactory = NodeCanvasFactory.create(
+      Math.floor(scaledViewport.width),
+      Math.floor(scaledViewport.height)
+    );
+    
+    // Render page to canvas
+    const renderContext = {
+      canvasContext: canvasFactory.context,
+      viewport: scaledViewport,
+    };
+    
+    await page.render(renderContext).promise;
+    logToRenderer('[Vinted Profile] PDF.js rendering complete');
+    
+    // Save canvas to PNG file
+    const buffer = canvasFactory.canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPngPath, buffer);
+    
+    logToRenderer(`[Vinted Profile] ✅ PDF rendered to PNG: ${outputPngPath}`);
+    
+    // Cleanup
+    NodeCanvasFactory.destroy(canvasFactory);
+    await pdfDocument.destroy();
+  } catch (error: any) {
+    errorToRenderer('[Vinted Profile] ❌ PDF.js rendering failed:', error.message);
+    if (error.stack) {
+      errorToRenderer('[Vinted Profile] Stack trace:', error.stack);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Render PDF to PNG with automatic fallback
+ * Tries Ghostscript first, falls back to PDF.js if it fails
+ */
+async function renderPdfToPng(
+  pdfPath: string,
+  outputPngPath: string,
+  dpi: number = 300
+): Promise<void> {
+  const gsBinPath = findGhostscript();
+  
+  // Try Ghostscript if available
+  if (gsBinPath && verifyGhostscriptInstallation(gsBinPath)) {
+    try {
+      const gsExePath = path.resolve(gsBinPath, 'gswin64c.exe');
+      const gsDllPath = path.resolve(gsBinPath, 'gsdll64.dll');
+      
+      // Set up Ghostscript environment
+      const env = { ...process.env };
+      env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
+      
+      const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
+      if (fs.existsSync(gsLibPath)) {
+        env.GS_LIB = gsLibPath;
+        logToRenderer('[Vinted Profile] Set GS_LIB:', gsLibPath);
+      }
+      
+      // Log directory contents for debugging
+      try {
+        const binContents = fs.readdirSync(gsBinPath);
+        logToRenderer('[Vinted Profile] Ghostscript bin contents:', binContents.slice(0, 10).join(', '));
+        logToRenderer('[Vinted Profile] Ghostscript lib exists:', fs.existsSync(gsLibPath));
+      } catch (e) {
+        // Ignore directory listing errors
+      }
+      
+      const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r${dpi} -dFirstPage=1 -dLastPage=1 -sOutputFile="${outputPngPath}" "${pdfPath}"`;
+      logToRenderer('[Vinted Profile] Executing Ghostscript:', gsCommand);
+      
+      execSync(gsCommand, { 
+        windowsHide: true,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env,
+        cwd: gsBinPath  // IMPORTANT: Set working directory to Ghostscript bin
+      });
+      
+      // Verify output was created
+      if (fs.existsSync(outputPngPath)) {
+        logToRenderer('[Vinted Profile] ✅ Ghostscript rendered PDF successfully');
+        return;
+      } else {
+        throw new Error('Ghostscript did not create output file');
+      }
+    } catch (error: any) {
+      logToRenderer('[Vinted Profile] ⚠️ Ghostscript failed, falling back to PDF.js');
+      logToRenderer('[Vinted Profile] Error:', error.message);
+      if (error.status) {
+        errorToRenderer('[Vinted Profile] Exit code:', error.status);
+      }
+      if (error.stderr) {
+        errorToRenderer('[Vinted Profile] Stderr:', error.stderr);
+      }
+    }
+  } else {
+    logToRenderer('[Vinted Profile] Ghostscript not available, using PDF.js');
+  }
+  
+  // Fallback to PDF.js
+  logToRenderer('[Vinted Profile] Using PDF.js for PDF rendering');
+  await renderPdfToPngWithPdfJs(pdfPath, outputPngPath, dpi);
+}
+
+/**
  * Process Hermes PDF using Ghostscript + Sharp (direct approach)
  * Strategy: Use Ghostscript to render PDF to PNG, then crop and rotate with Sharp
  */
 async function processHermesPdf(inputPath: string): Promise<string> {
-  logToRenderer('[Vinted Profile] 🔄 Processing Hermes PDF with Ghostscript + Sharp');
+  logToRenderer('[Vinted Profile] 🔄 Processing Hermes PDF');
 
-  // Find Ghostscript
-  const gsBinPath = findGhostscript();
-  if (!gsBinPath) {
-    const errorMsg = 'Ghostscript nicht gefunden. Hermes-Labels können nicht verarbeitet werden. ' +
-      'Bitte installieren Sie Ghostscript oder kontaktieren Sie den Support.';
-    errorToRenderer('[Vinted Profile] ❌', errorMsg);
-    throw new Error(errorMsg);
-  }
-  
-  const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
-  logToRenderer('[Vinted Profile] Using Ghostscript at:', gsExePath);
-
-  // Set up Ghostscript environment
-  const env = { ...process.env };
-  env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
-  
-  // Set GS_LIB to point to Ghostscript library directory
-  const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
-  if (fs.existsSync(gsLibPath)) {
-    env.GS_LIB = gsLibPath;
-    logToRenderer('[Vinted Profile] Set GS_LIB:', gsLibPath);
-  }
-
-  const tempPngPath = path.join(getTempDir(), `hermes_gs_${Date.now()}.png`);
+  const tempPngPath = path.join(getTempDir(), `hermes_${Date.now()}.png`);
   
   try {
-    // Step 1: Use Ghostscript to render PDF to high-res PNG
-    // -dNOPAUSE -dBATCH: non-interactive mode
-    // -sDEVICE=png16m: 24-bit color PNG
-    // -r300: 300 DPI resolution
-    // -dFirstPage=1 -dLastPage=1: only first page
-    const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r${TARGET_DPI} -dFirstPage=1 -dLastPage=1 -sOutputFile="${tempPngPath}" "${inputPath}"`;
-    logToRenderer('[Vinted Profile] Executing Ghostscript:', gsCommand);
+    // Step 1: Render PDF to PNG (with automatic fallback)
+    await renderPdfToPng(inputPath, tempPngPath, TARGET_DPI);
     
-    execSync(gsCommand, { 
-      windowsHide: true,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env
-    });
-    
-    logToRenderer('[Vinted Profile] ✅ Ghostscript rendered PDF to PNG');
+    logToRenderer('[Vinted Profile] ✅ PDF rendered to PNG');
 
     // Step 2: Load image with Sharp and get dimensions
     const metadata = await sharp(tempPngPath).metadata();
@@ -434,46 +596,15 @@ async function processHermesPdf(inputPath: string): Promise<string> {
  * Strategy: Use Ghostscript to render PDF to PNG, then crop and rotate with Sharp
  */
 async function processStandardPdf(inputPath: string): Promise<string> {
-  logToRenderer('[Vinted Profile] 🔄 Processing standard PDF (GLS/DHL) with Ghostscript + Sharp');
+  logToRenderer('[Vinted Profile] 🔄 Processing standard PDF (GLS/DHL)');
 
-  // Find Ghostscript
-  const gsBinPath = findGhostscript();
-  if (!gsBinPath) {
-    const errorMsg = 'Ghostscript nicht gefunden. GLS/DHL-Labels können nicht verarbeitet werden. ' +
-      'Bitte installieren Sie Ghostscript oder kontaktieren Sie den Support.';
-    errorToRenderer('[Vinted Profile] ❌', errorMsg);
-    throw new Error(errorMsg);
-  }
-  
-  const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
-  logToRenderer('[Vinted Profile] Using Ghostscript at:', gsExePath);
-
-  // Set up Ghostscript environment
-  const env = { ...process.env };
-  env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
-  
-  // Set GS_LIB to point to Ghostscript library directory
-  const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
-  if (fs.existsSync(gsLibPath)) {
-    env.GS_LIB = gsLibPath;
-    logToRenderer('[Vinted Profile] Set GS_LIB:', gsLibPath);
-  }
-
-  const tempPngPath = path.join(getTempDir(), `standard_gs_${Date.now()}.png`);
+  const tempPngPath = path.join(getTempDir(), `standard_${Date.now()}.png`);
   
   try {
-    // Step 1: Use Ghostscript to render PDF to high-res PNG
-    const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r${TARGET_DPI} -dFirstPage=1 -dLastPage=1 -sOutputFile="${tempPngPath}" "${inputPath}"`;
-    logToRenderer('[Vinted Profile] Executing Ghostscript:', gsCommand);
+    // Step 1: Render PDF to PNG (with automatic fallback)
+    await renderPdfToPng(inputPath, tempPngPath, TARGET_DPI);
     
-    execSync(gsCommand, { 
-      windowsHide: true,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env
-    });
-    
-    logToRenderer('[Vinted Profile] ✅ Ghostscript rendered PDF to PNG');
+    logToRenderer('[Vinted Profile] ✅ PDF rendered to PNG');
 
     // Step 2: Load image with Sharp and get dimensions
     const metadata = await sharp(tempPngPath).metadata();

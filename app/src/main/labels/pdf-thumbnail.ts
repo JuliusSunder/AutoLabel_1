@@ -109,6 +109,28 @@ function findGhostscript(): string | null {
 }
 
 /**
+ * Verify Ghostscript installation by checking for required files
+ * Returns true if all required files exist
+ */
+function verifyGhostscriptInstallation(gsBinPath: string): boolean {
+  const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
+  const gsDllPath = path.join(gsBinPath, 'gsdll64.dll');
+  
+  if (!fs.existsSync(gsExePath)) {
+    errorToRenderer('[Thumbnail] ❌ gswin64c.exe not found at:', gsExePath);
+    return false;
+  }
+  
+  if (!fs.existsSync(gsDllPath)) {
+    errorToRenderer('[Thumbnail] ❌ gsdll64.dll not found at:', gsDllPath);
+    return false;
+  }
+  
+  logToRenderer('[Thumbnail] ✅ Ghostscript installation verified');
+  return true;
+}
+
+/**
  * Fix ImageMagick delegates.xml to use correct Ghostscript path
  * The portable ImageMagick version has @PSDelegate@ placeholder that needs to be replaced
  * Returns path to the directory containing the fixed config files
@@ -286,121 +308,111 @@ async function generatePDFThumbnailInternal(
   pdfPath: string,
   width: number
 ): Promise<string> {
-  logToRenderer(`[Thumbnail] 🖼️ Generating PDF thumbnail with Ghostscript: ${pdfPath}`);
+  logToRenderer(`[Thumbnail] 🖼️ Generating PDF thumbnail: ${pdfPath}`);
 
-  try {
-    // Find Ghostscript
-    const gsBinPath = findGhostscript();
-    if (!gsBinPath) {
-      warnToRenderer('[Thumbnail] ⚠️ Ghostscript not found, falling back to PDF.js');
-      return await generatePDFThumbnailWithPdfJs(pdfPath, width);
-    }
-    
-    const gsExePath = path.join(gsBinPath, 'gswin64c.exe');
-    logToRenderer('[Thumbnail] Using Ghostscript at:', gsExePath);
-
-    // Set up Ghostscript environment
-    const env = { ...process.env };
-    env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
-    
-    // Set GS_LIB to point to Ghostscript library directory
-    const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
-    if (fs.existsSync(gsLibPath)) {
-      env.GS_LIB = gsLibPath;
-      logToRenderer('[Thumbnail] Set GS_LIB:', gsLibPath);
-    }
-
-    // Get temp directory
-    const userDataPath = app.getPath('userData');
-    const tempDir = path.join(userDataPath, 'temp-thumbnails');
-    
-    // Create temp directory if it doesn't exist
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    // Generate unique output filename
-    const outputFilename = `thumb_${Date.now()}.png`;
-    const outputPath = path.join(tempDir, outputFilename);
-    
-    // Calculate height (2:3 aspect ratio)
-    const height = Math.floor(width * 1.5);
-
-    logToRenderer(`[Thumbnail] Converting first page of PDF to ${width}x${height} PNG...`);
-
-    // Use Ghostscript to convert PDF to PNG
-    // -dNOPAUSE -dBATCH: non-interactive mode
-    // -sDEVICE=png16m: 24-bit color PNG
-    // -r200: 200 DPI resolution (good for thumbnails)
-    // -dFirstPage=1 -dLastPage=1: only first page
-    const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r200 -dFirstPage=1 -dLastPage=1 -sOutputFile="${outputPath}" "${pdfPath}"`;
-    
-    logToRenderer(`[Thumbnail] Executing: ${gsCommand}`);
-    
-    // Execute Ghostscript command
-    const { stdout, stderr } = await execAsync(gsCommand, { windowsHide: true, env });
-    
-    if (stdout) {
-      logToRenderer(`[Thumbnail] Ghostscript stdout: ${stdout}`);
-    }
-    
-    if (stderr) {
-      // Ghostscript writes info to stderr even on success
-      logToRenderer(`[Thumbnail] Ghostscript stderr: ${stderr}`);
-    }
-    
-    logToRenderer(`[Thumbnail] PDF converted, checking output file: ${outputPath}`);
-
-    // Verify the output file exists
-    if (!fs.existsSync(outputPath)) {
-      throw new Error('Ghostscript did not produce output file');
-    }
-
-    // Resize to exact dimensions using Sharp
-    const resizedBuffer = await sharp(outputPath)
-      .resize(width, height, {
-        fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
-      })
-      .png({ quality: 90, compressionLevel: 9 })
-      .toBuffer();
-
-    const base64Data = resizedBuffer.toString('base64');
-    
-    logToRenderer(`[Thumbnail] Image resized, base64 length: ${base64Data.length}`);
-    
-    // Clean up temp file
+  // Find Ghostscript
+  const gsBinPath = findGhostscript();
+  
+  // Try Ghostscript if available and verified
+  if (gsBinPath && verifyGhostscriptInstallation(gsBinPath)) {
     try {
-      fs.unlinkSync(outputPath);
-      logToRenderer(`[Thumbnail] Cleaned up temp file: ${outputPath}`);
-    } catch (cleanupError) {
-      warnToRenderer('[Thumbnail] Failed to cleanup temp file:', cleanupError);
-    }
+      const gsExePath = path.resolve(gsBinPath, 'gswin64c.exe');
+      logToRenderer('[Thumbnail] Using Ghostscript at:', gsExePath);
 
-    // Return as data URL
-    const dataUrl = `data:image/png;base64,${base64Data}`;
+      // Set up Ghostscript environment
+      const env = { ...process.env };
+      env.PATH = `${gsBinPath}${path.delimiter}${env.PATH || ''}`;
+      
+      // Set GS_LIB to point to Ghostscript library directory
+      const gsLibPath = path.join(path.dirname(gsBinPath), 'lib');
+      if (fs.existsSync(gsLibPath)) {
+        env.GS_LIB = gsLibPath;
+        logToRenderer('[Thumbnail] Set GS_LIB:', gsLibPath);
+      }
 
-    logToRenderer(`[Thumbnail] ✅ PDF thumbnail generated successfully (data URL length: ${dataUrl.length})`);
-    return dataUrl;
+      // Get temp directory
+      const userDataPath = app.getPath('userData');
+      const tempDir = path.join(userDataPath, 'temp-thumbnails');
+      
+      // Create temp directory if it doesn't exist
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
 
-  } catch (error: any) {
-    errorToRenderer('[Thumbnail] ❌ Failed to generate PDF thumbnail with Ghostscript');
-    errorToRenderer('[Thumbnail] Error message:', error.message);
-    
-    if (error.stderr) {
-      errorToRenderer('[Thumbnail] Stderr:', error.stderr);
+      // Generate unique output filename
+      const outputFilename = `thumb_${Date.now()}.png`;
+      const outputPath = path.join(tempDir, outputFilename);
+      
+      // Calculate height (2:3 aspect ratio)
+      const height = Math.floor(width * 1.5);
+
+      logToRenderer(`[Thumbnail] Converting first page of PDF to ${width}x${height} PNG...`);
+
+      // Use Ghostscript to convert PDF to PNG
+      const gsCommand = `"${gsExePath}" -dNOPAUSE -dBATCH -sDEVICE=png16m -r200 -dFirstPage=1 -dLastPage=1 -sOutputFile="${outputPath}" "${pdfPath}"`;
+      
+      logToRenderer(`[Thumbnail] Executing: ${gsCommand}`);
+      
+      // Execute Ghostscript command with working directory set
+      const { stdout, stderr } = await execAsync(gsCommand, { 
+        windowsHide: true, 
+        env,
+        cwd: gsBinPath  // Set working directory to Ghostscript bin
+      });
+      
+      if (stdout) {
+        logToRenderer(`[Thumbnail] Ghostscript stdout: ${stdout}`);
+      }
+      
+      if (stderr) {
+        // Ghostscript writes info to stderr even on success
+        logToRenderer(`[Thumbnail] Ghostscript stderr: ${stderr}`);
+      }
+
+      // Verify the output file exists
+      if (fs.existsSync(outputPath)) {
+        // Resize to exact dimensions using Sharp
+        const resizedBuffer = await sharp(outputPath)
+          .resize(width, height, {
+            fit: 'contain',
+            background: { r: 255, g: 255, b: 255, alpha: 1 },
+          })
+          .png({ quality: 90, compressionLevel: 9 })
+          .toBuffer();
+
+        const base64Data = resizedBuffer.toString('base64');
+        
+        // Clean up temp file
+        try {
+          fs.unlinkSync(outputPath);
+        } catch (cleanupError) {
+          warnToRenderer('[Thumbnail] Failed to cleanup temp file:', cleanupError);
+        }
+
+        // Return as data URL
+        const dataUrl = `data:image/png;base64,${base64Data}`;
+        logToRenderer(`[Thumbnail] ✅ Ghostscript thumbnail generated successfully`);
+        return dataUrl;
+      } else {
+        throw new Error('Ghostscript did not produce output file');
+      }
+
+    } catch (error: any) {
+      errorToRenderer('[Thumbnail] ❌ Ghostscript failed');
+      errorToRenderer('[Thumbnail] Error:', error.message);
+      
+      if (error.code) {
+        errorToRenderer('[Thumbnail] Exit code:', error.code);
+      }
+      
+      logToRenderer('[Thumbnail] Falling back to PDF.js...');
     }
-    if (error.stdout) {
-      logToRenderer('[Thumbnail] Stdout:', error.stdout);
-    }
-    if (error.code) {
-      errorToRenderer('[Thumbnail] Exit code:', error.code);
-    }
-    
-    // Fallback to PDF.js renderer
-    logToRenderer('[Thumbnail] Trying PDF.js fallback renderer...');
-    return await generatePDFThumbnailWithPdfJs(pdfPath, width);
+  } else {
+    logToRenderer('[Thumbnail] Ghostscript not available, using PDF.js');
   }
+  
+  // Fallback to PDF.js (always works)
+  return await generatePDFThumbnailWithPdfJs(pdfPath, width);
 }
 
 /**
