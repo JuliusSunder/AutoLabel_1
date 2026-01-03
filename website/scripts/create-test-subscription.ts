@@ -138,7 +138,7 @@ async function createTestSubscription(email: string, plan: 'plus' | 'pro') {
     console.log('- Plan:', plan);
     console.log('- Stripe Customer ID:', stripeCustomerId);
     console.log('- Stripe Subscription ID:', stripeSubscription.id);
-    console.log('- License Key:', licenseKey);
+    console.log('- License Key:', license.licenseKey);
     console.log('\nYou can now:');
     console.log('1. Login to the dashboard');
     console.log('2. Click "Manage Subscription"');
