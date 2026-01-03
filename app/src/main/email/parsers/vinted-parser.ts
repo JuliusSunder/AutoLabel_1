@@ -9,19 +9,75 @@ import type { EmailMessage } from '../imap-client';
 export interface VintedParseResult {
   carrier: 'Hermes' | 'DPD' | 'DHL' | 'GLS' | 'UPS' | null;
   itemTitle: string;
+  productNumber?: string;
   instructions: string;
 }
 
 /**
+ * Extract product number from title (after "|" separator)
+ * Users put product numbers after the "|" separator
+ * Works with or without spaces: "Item | 123" or "Item|123"
+ * Extracts consecutive digits from left to right after the separator
+ * 
+ * Examples:
+ * - "Item | 12345" -> "12345"
+ * - "Item |12345" -> "12345"
+ * - "Item| 12345" -> "12345"
+ * - "Item|12345" -> "12345"
+ * - "Item | 42" -> "42"
+ * - "Item | " -> undefined
+ * - "Item" -> undefined
+ */
+function extractProductNumber(subject: string): string | undefined {
+  console.log(`[Vinted Parser] Extracting product number from subject: "${subject}"`);
+  
+  // Find the "|" separator (with or without spaces)
+  const separatorIndex = subject.indexOf('|');
+  
+  if (separatorIndex === -1) {
+    console.log('[Vinted Parser] No "|" separator found');
+    return undefined; // No separator found
+  }
+  
+  // Get text after the separator and trim whitespace
+  const afterSeparator = subject.substring(separatorIndex + 1).trim();
+  console.log(`[Vinted Parser] Text after "|": "${afterSeparator}"`);
+  
+  if (!afterSeparator) {
+    console.log('[Vinted Parser] Nothing after separator');
+    return undefined; // Nothing after separator
+  }
+  
+  // Extract consecutive digits from the start (left to right)
+  let productNumber = '';
+  for (let i = 0; i < Math.min(afterSeparator.length, 5); i++) {
+    const char = afterSeparator[i];
+    if (/\d/.test(char)) {
+      productNumber += char;
+    } else {
+      // Stop at first non-digit character
+      break;
+    }
+  }
+  
+  console.log(`[Vinted Parser] Extracted product number: "${productNumber || 'none'}"`);
+  return productNumber || undefined;
+}
+
+/**
  * Extract item title from Vinted email subject
- * Format: "Versandschein für [ITEM] | [NUMBER]..."
+ * Format: "Versandschein für [ITEM] | [NUMBER]..." or "Versandschein für [ITEM]|[NUMBER]..."
+ * Returns only the item part (before "|")
  */
 function extractItemTitle(subject: string): string {
   // Remove "Versandschein für" prefix
   let title = subject.replace(/^Versandschein\s+für\s+/i, '');
   
-  // Remove trailing order number pattern (e.g., "| 34. Letzter Tag...")
-  title = title.replace(/\s*\|\s*\d+\.\s+.*$/i, '');
+  // Split at "|" separator and take only the first part (item title)
+  const separatorIndex = title.indexOf('|');
+  if (separatorIndex !== -1) {
+    title = title.substring(0, separatorIndex);
+  }
   
   // Trim and clean up
   title = title.trim();
@@ -114,6 +170,7 @@ export function parseVintedEmail(email: EmailMessage): VintedParseResult {
         return {
           carrier: carrier as any,
           itemTitle: extractItemTitle(email.subject),
+          productNumber: extractProductNumber(email.subject),
           instructions: extractInstructions(body)
         };
       }
@@ -130,6 +187,7 @@ export function parseVintedEmail(email: EmailMessage): VintedParseResult {
       return {
         carrier: carrier as any,
         itemTitle: extractItemTitle(email.subject),
+        productNumber: extractProductNumber(email.subject),
         instructions: extractInstructions(body)
       };
     }
@@ -139,6 +197,7 @@ export function parseVintedEmail(email: EmailMessage): VintedParseResult {
   return {
     carrier: null,
     itemTitle: extractItemTitle(email.subject),
+    productNumber: extractProductNumber(email.subject),
     instructions: extractInstructions(body)
   };
 }

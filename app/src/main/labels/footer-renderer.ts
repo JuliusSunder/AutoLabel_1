@@ -16,8 +16,9 @@ import { getFooterHeightPixels, getTargetPixelDimensions } from './utils';
 function generateFooterText(sale: Sale, config: FooterConfig): string {
   const parts: string[] = [];
 
-  if (config.includeProductNumber) {
-    parts.push(sale.productNumber ? `#${sale.productNumber}` : 'No Product Number');
+  if (config.includeProductNumber && sale.productNumber) {
+    // Only add product number if it exists (don't show "No Product Number")
+    parts.push(`#${sale.productNumber}`);
   }
 
   if (config.includeItemTitle) {

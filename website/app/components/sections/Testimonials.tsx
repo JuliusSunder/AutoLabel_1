@@ -1,5 +1,5 @@
 import { Container } from '../ui/Container';
-import { Quote, Star } from 'lucide-react';
+import { Quote, Star, Clock, CheckCircle2 } from 'lucide-react';
 import { FeedbackForm } from './FeedbackForm';
 
 const testimonials = [
@@ -125,8 +125,87 @@ export function Testimonials() {
           </div>
         </div>
 
-        {/* Feedback Form */}
-        <FeedbackForm />
+        {/* Feedback Form & Upcoming Features - Two Column Layout */}
+        <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Feedback Form */}
+          <div className="bg-gray-50 rounded-2xl p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-3">
+                <Quote className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-primary mb-2">
+                Share Your Feedback
+              </h3>
+              <p className="text-sm text-primary-lighter">
+                Have suggestions or feedback? We'd love to hear from you!
+              </p>
+            </div>
+            <FeedbackForm />
+          </div>
+
+          {/* Right Column - Upcoming Features */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 mb-3">
+                <Clock className="h-6 w-6 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-bold text-primary mb-2">
+                Upcoming
+              </h3>
+              <p className="text-sm text-primary-lighter">
+                Features we're working on
+              </p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              {[
+                {
+                  title: 'Depop Platform Support & Other Platforms',
+                  description: 'Automatic scanning and processing of Depop and other platform shipping labels',
+                },
+                {
+                  title: 'International Shipping Labels',
+                  description: 'Support for international labels (e.g., international DHL, UPS, FedEx labels)',
+                },
+                {
+                  title: 'Multi-Language Support',
+                  description: 'Support for labels in different languages',
+                },
+                {
+                  title: 'Advanced Label Templates',
+                  description: 'Customizable footer templates with more options',
+                },
+                {
+                  title: 'Alternative Import Methods',
+                  description: 'Other options than IMAP (e.g., watch folder for automatic label detection from a download folder)',
+                },
+              ].map((feature, index) => (
+                <div
+                  key={index}
+                  className="flex gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 hover:border-purple-200 transition-colors"
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    <CheckCircle2 className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-primary mb-1">
+                      {feature.title}
+                    </h4>
+                    <p className="text-xs text-primary-lighter leading-relaxed">
+                      {feature.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-sm text-center text-green-600 italic">
+                Feel free to suggest us some features/changes!
+              </p>
+            </div>
+          </div>
+        </div>
       </Container>
     </section>
   );

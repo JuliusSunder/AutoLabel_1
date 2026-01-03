@@ -88,7 +88,7 @@ export function Hero() {
             <div className="absolute bottom-4 left-4 right-4 p-4 glass-panel rounded-xl backdrop-blur-md bg-white/30 border border-white/20 hidden sm:block">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-sm font-medium text-gray-800">See how AutoLabel works in 2 minutes</span>
+                <span className="text-sm font-medium text-gray-800">Coming soon...</span>
               </div>
             </div>
           </div>

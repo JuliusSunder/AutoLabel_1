@@ -309,11 +309,18 @@ async function scanVintedSingleAccount(account: EmailAccount, scanDays: number):
           continue;
         }
 
+        console.log(`[Vinted Scanner] 📝 Parse result:`, {
+          itemTitle: result.itemTitle,
+          productNumber: result.productNumber,
+          carrier: result.carrier
+        });
+
         const sale = salesRepo.createSale({
           emailId: email.messageId,
           date: email.date.toISOString().split('T')[0],
           platform: 'Vinted/Kleiderkreisel',
           shippingCompany: result.carrier || undefined,
+          productNumber: result.productNumber,
           itemTitle: result.itemTitle,
           accountId: account.id,
           metadata: {
@@ -337,6 +344,7 @@ async function scanVintedSingleAccount(account: EmailAccount, scanDays: number):
         newSales++;
         console.log(`[Vinted Scanner] ✅ Created sale: ${sale.id}`);
         console.log(`   Item: ${result.itemTitle}`);
+        console.log(`   Product Number: ${result.productNumber || 'None'}`);
         console.log(`   Carrier: ${result.carrier || 'Unknown'}`);
         console.log(`   Attachments: ${savedAttachments.length}\n`);
 

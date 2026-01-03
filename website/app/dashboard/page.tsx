@@ -160,6 +160,28 @@ export default function DashboardPage() {
     }
   };
 
+  const handleManageSubscription = async () => {
+    try {
+      const response = await fetch("/api/stripe/create-portal-session", {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Failed to open subscription management");
+        return;
+      }
+
+      // Redirect to Stripe Customer Portal
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Portal session error:", error);
+      alert("An error occurred: " + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError("");
@@ -382,6 +404,23 @@ export default function DashboardPage() {
                   : "If you have already paid, click here to synchronize your subscription."}
               </p>
             </div>
+
+            {/* Manage Subscription Button - Only for Premium users */}
+            {isPremium && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <Button
+                  onClick={handleManageSubscription}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Manage Subscription
+                </Button>
+                <p className="text-xs text-gray-500 mt-2">
+                  Cancel, update payment method, or view invoices in the Stripe Customer Portal.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Usage Info Card - Für alle User */}

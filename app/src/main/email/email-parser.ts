@@ -137,10 +137,61 @@ export function isShippingLabelEmail(email: EmailMessage): boolean {
 }
 
 /**
- * Extract product number from text
+ * Extract product number from title (after "|" separator)
+ * Users put product numbers after the "|" separator
+ * Works with or without spaces: "Item | 123" or "Item|123"
+ * Extracts consecutive digits from left to right after the separator
+ * 
+ * Examples:
+ * - "Item | 12345" -> "12345"
+ * - "Item |12345" -> "12345"
+ * - "Item| 12345" -> "12345"
+ * - "Item|12345" -> "12345"
+ * - "Item | 42" -> "42"
+ * - "Item | " -> undefined
+ * - "Item" -> undefined
+ */
+function extractProductNumberFromTitle(title: string): string | undefined {
+  // Find the "|" separator (with or without spaces)
+  const separatorIndex = title.indexOf('|');
+  
+  if (separatorIndex === -1) {
+    return undefined; // No separator found
+  }
+  
+  // Get text after the separator and trim whitespace
+  const afterSeparator = title.substring(separatorIndex + 1).trim();
+  
+  if (!afterSeparator) {
+    return undefined; // Nothing after separator
+  }
+  
+  // Extract consecutive digits from the start (left to right)
+  let productNumber = '';
+  for (let i = 0; i < Math.min(afterSeparator.length, 5); i++) {
+    const char = afterSeparator[i];
+    if (/\d/.test(char)) {
+      productNumber += char;
+    } else {
+      // Stop at first non-digit character
+      break;
+    }
+  }
+  
+  return productNumber || undefined;
+}
+
+/**
+ * Extract product number from text (fallback patterns)
  */
 function extractProductNumber(text: string): string | undefined {
-  // Common patterns for product numbers
+  // First, try to extract from title with " | " separator
+  const fromTitle = extractProductNumberFromTitle(text);
+  if (fromTitle) {
+    return fromTitle;
+  }
+  
+  // Fallback: Common patterns for product numbers
   const patterns = [
     /(?:Art\.?-?Nr\.?|Artikel|Item|Product)\s*:?\s*([A-Z0-9-]+)/i,
     /(?:#|Nr\.?)\s*([0-9]{6,})/i,
@@ -174,6 +225,12 @@ function extractItemTitle(subject: string, body: string): string | undefined {
     .replace(/\s+(für|for|zum|to)\s+Auftrag\s+#?\d+/gi, '') // Remove order numbers
     .replace(/\s+#\d{10,}/g, '') // Remove long numbers (order IDs)
     .trim();
+  
+  // Remove product number part (after "|" separator, with or without spaces)
+  const separatorIndex = title.indexOf('|');
+  if (separatorIndex !== -1) {
+    title = title.substring(0, separatorIndex).trim();
+  }
   
   // If title is still meaningful, use it
   if (title.length >= 10 && title.length <= 150) {

@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
-import { Mail, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
 
 export function FeedbackForm() {
   const [email, setEmail] = useState('');
@@ -59,22 +58,7 @@ export function FeedbackForm() {
   };
 
   return (
-    <div className="py-12 bg-gray-50">
-      <Container>
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-3">
-              <Mail className="h-6 w-6 text-blue-600" />
-            </div>
-            <h3 className="text-xl font-bold text-primary mb-2">
-              Share Your Feedback
-            </h3>
-            <p className="text-sm text-primary-lighter">
-              Have suggestions or feedback? We'd love to hear from you!
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+    <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
             {success && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
                 Thank you! Your feedback has been sent successfully.
@@ -127,7 +111,7 @@ export function FeedbackForm() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 required
-                rows={4}
+                rows={12}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 placeholder="Share your suggestions, feature requests, or feedback..."
               />
@@ -151,9 +135,6 @@ export function FeedbackForm() {
               )}
             </Button>
           </form>
-        </div>
-      </Container>
-    </div>
   );
 }
 
