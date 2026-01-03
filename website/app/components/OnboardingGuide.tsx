@@ -62,8 +62,8 @@ interface Translations {
         doneTitle: string;
         doneText: string;
       };
-    }[];
-  };
+    };
+  }[];
   ui: {
     stepOf: string;
     completed: string;
