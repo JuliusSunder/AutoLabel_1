@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import type { PrinterInfo } from '../../shared/types';
+import { warnToRenderer } from '../utils/renderer-logger';
 
 /**
  * Extended Electron PrinterInfo with runtime properties
@@ -155,9 +156,12 @@ export async function getDefaultPrinter(): Promise<string | null> {
  */
 function findSumatraPDF(): string | null {
   const possiblePaths = [
-    // Bundled with app (primary location for packaged builds)
-    // IMPORTANT: process.resourcesPath must be checked FIRST for production builds
+    // Primary location: resources/SumatraPDF/ (direct extraResource location)
+    path.join(process.resourcesPath || '', 'SumatraPDF', 'SumatraPDF.exe'),
+    // Alternative location: resources/bin/SumatraPDF/ (with bin/ folder)
     path.join(process.resourcesPath || '', 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
+    // Unpacked location: resources/app.asar.unpacked/bin/SumatraPDF/ (AutoUnpackNativesPlugin)
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
     // Development paths (when running from source)
     path.join(app.getAppPath(), 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
     path.join(process.cwd(), 'app', 'bin', 'SumatraPDF', 'SumatraPDF.exe'),
@@ -170,26 +174,42 @@ function findSumatraPDF(): string | null {
     'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
   ];
 
-  console.debug('[Printer] Searching for SumatraPDF...');
+  console.log('[Printer] ========================================');
+  console.log('[Printer] 🔍 Searching for SumatraPDF...');
+  console.log('[Printer] process.resourcesPath:', process.resourcesPath);
+  console.log('[Printer] app.getAppPath():', app.getAppPath());
+  console.log('[Printer] process.cwd():', process.cwd());
+  console.log('[Printer] ========================================');
+  
   for (const sumatraPath of possiblePaths) {
-    console.debug(`[Printer] Checking: ${sumatraPath}`);
+    console.log(`[Printer] Checking: ${sumatraPath}`);
+    
+    // Skip ASAR paths (without .unpacked) - Windows cannot execute .exe files from ASAR archives
+    if (sumatraPath.includes('app.asar') && !sumatraPath.includes('app.asar.unpacked')) {
+      console.log(`[Printer] ⚠️ Skipping ASAR path (cannot execute .exe from ASAR): ${sumatraPath}`);
+      continue;
+    }
+    
     if (fs.existsSync(sumatraPath)) {
-      console.log(`[Printer] ✓ Found SumatraPDF at: ${sumatraPath}`);
+      console.log(`[Printer] ✅ FOUND SumatraPDF at: ${sumatraPath}`);
       return sumatraPath;
+    } else {
+      console.log(`[Printer] ❌ Not found at: ${sumatraPath}`);
     }
   }
 
   // Try to find in PATH
   try {
-    execSync('where SumatraPDF.exe', { encoding: 'utf-8', windowsHide: true });
-    console.log('[Printer] ✓ Found SumatraPDF in system PATH');
+    const result = execSync('where SumatraPDF.exe', { encoding: 'utf-8', windowsHide: true });
+    console.log('[Printer] ✅ Found SumatraPDF in system PATH:', result.trim());
     return 'SumatraPDF.exe';
   } catch {
-    // Not in PATH
+    console.log('[Printer] ❌ Not found in system PATH');
   }
 
-  console.warn('[Printer] ⚠ SumatraPDF not found in any location');
-  console.warn('[Printer] Searched paths:', possiblePaths);
+  console.error('[Printer] ⚠️⚠️⚠️ SumatraPDF NOT FOUND IN ANY LOCATION ⚠️⚠️⚠️');
+  console.error('[Printer] This will cause printing issues with label printers!');
+  console.error('[Printer] Searched paths:', possiblePaths);
   return null;
 }
 
@@ -259,6 +279,9 @@ async function printPdfWithSumatra(
     );
   }
 
+  console.log(`[Printer] Using SumatraPDF at: ${sumatraPath}`);
+  warnToRenderer(`[Printer] Using SumatraPDF at: ${sumatraPath}`);
+
   // NOTE: We don't check printer availability beforehand because Windows status is unreliable
   // Instead, we check for failed jobs in the print queue after sending the job
   
@@ -270,17 +293,20 @@ async function printPdfWithSumatra(
   // Build command: SumatraPDF.exe -print-to "Printer Name" "file.pdf"
   const command = `${escapedSumatraPath} -print-to ${escapedPrinterName} ${escapedPdfPath}`;
 
-  console.debug(`[Printer] Executing SumatraPDF command: ${command}`);
+  console.log(`[Printer] Executing SumatraPDF command: ${command}`);
+  warnToRenderer(`[Printer] Executing SumatraPDF: ${printerName}`);
 
   try {
     // Execute synchronously
-    execSync(command, {
+    const output = execSync(command, {
       encoding: 'utf-8',
       timeout: 10000, // 10 second timeout
       windowsHide: true,
     });
 
     console.log(`[Printer] SumatraPDF command completed`);
+    console.log(`[Printer] SumatraPDF output:`, output);
+    warnToRenderer(`[Printer] SumatraPDF command completed`);
     
     // IMPORTANT: Windows/SumatraPDF doesn't reliably report offline printers
     // The job goes to the spooler and appears "successful" even if printer is off
@@ -288,14 +314,20 @@ async function printPdfWithSumatra(
     
   } catch (error: any) {
     console.error('[Printer] SumatraPDF execution failed:', error);
+    warnToRenderer(`[Printer] SumatraPDF execution failed: ${error?.message}`);
     
     const errorMsg = error?.message || 'Unknown error';
+    const stderr = error?.stderr || '';
+    const stdout = error?.stdout || '';
+    
+    console.error('[Printer] Error details:', { errorMsg, stderr, stdout, code: error?.code });
     
     if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
-      throw new Error('Print timeout - printer offline or not reachable');
+      throw new Error('SUMATRA_TIMEOUT: Print timeout - printer offline or not reachable');
     }
     
-    throw new Error(`Print failed - check printer "${printerName}"`);
+    // Throw error with SUMATRA_ prefix to distinguish from "not found" errors
+    throw new Error(`SUMATRA_PRINT_FAILED: Print failed for printer "${printerName}" - Error: ${errorMsg}`);
   }
 }
 
@@ -312,7 +344,10 @@ async function printPdfWithElectron(
     throw new Error('Kein Fenster für Druck verfügbar');
   }
 
-  console.log('[Printer] Using Electron fallback method (may have rendering issues)');
+  console.warn('[Printer] ⚠️⚠️⚠️ Using Electron fallback method ⚠️⚠️⚠️');
+  console.warn('[Printer] This may cause rendering issues with label printers (blank pages, black backgrounds, etc.)');
+  console.warn('[Printer] SumatraPDF is the recommended printing method!');
+  warnToRenderer('[Printer] ⚠️ SumatraPDF nicht gefunden - verwende Fallback-Methode. Dies kann zu leeren Seiten führen!');
 
   // Create a hidden window for printing with WHITE background
   const printWindow = new BrowserWindow({
@@ -381,10 +416,16 @@ export async function printPdf(
   printerName?: string
 ): Promise<void> {
   try {
+    console.log(`[Printer] ----------------------------------------`);
+    console.log(`[Printer] 🖨️ printPdf() called`);
+    warnToRenderer(`[Printer] 🖨️ printPdf() called`);
+    
     // Verify file exists
     if (!fs.existsSync(pdfPath)) {
       throw new Error('Label-Datei nicht gefunden');
     }
+    console.log(`[Printer] ✅ PDF file exists: ${pdfPath}`);
+    warnToRenderer(`[Printer] ✅ PDF file exists`);
 
     // If no printer specified, use default
     let targetPrinter = printerName;
@@ -394,6 +435,8 @@ export async function printPdf(
         throw new Error('Kein Drucker ausgewählt');
       }
     }
+    console.log(`[Printer] Target printer: ${targetPrinter}`);
+    warnToRenderer(`[Printer] Target printer: ${targetPrinter}`);
 
     // Validate printer exists
     const availablePrinters = await listPrinters();
@@ -403,29 +446,52 @@ export async function printPdf(
     if (!printerExists) {
       throw new Error(`Drucker "${targetPrinter}" nicht verfügbar`);
     }
+    console.log(`[Printer] ✅ Printer validated`);
+    warnToRenderer(`[Printer] ✅ Printer validated`);
 
-    console.log(`[Printer] Printing ${pdfPath} to ${targetPrinter}`);
+    console.log(`[Printer] 📄 Printing: ${path.basename(pdfPath)}`);
+    console.log(`[Printer] 🖨️  To printer: ${targetPrinter}`);
+    warnToRenderer(`[Printer] 📄 Printing to: ${targetPrinter}`);
 
     // Try SumatraPDF first (preferred method for label printers)
+    console.log(`[Printer] Attempting to print with SumatraPDF...`);
+    warnToRenderer(`[Printer] Attempting to print with SumatraPDF...`);
     try {
       await printPdfWithSumatra(pdfPath, targetPrinter);
-      console.log('[Printer] ✓ Successfully printed with SumatraPDF');
+      console.log('[Printer] ✅ Successfully printed with SumatraPDF');
+      warnToRenderer('[Printer] ✅ Successfully printed with SumatraPDF');
+      console.log(`[Printer] ----------------------------------------`);
       return;
     } catch (sumatraError) {
       const errorMessage = sumatraError instanceof Error ? sumatraError.message : 'Unknown error';
-      console.warn('[Printer] SumatraPDF failed:', errorMessage);
+      console.warn('[Printer] ⚠️ SumatraPDF failed:', errorMessage);
+      warnToRenderer(`[Printer] ⚠️ SumatraPDF failed: ${errorMessage}`);
       
-      // If SumatraPDF not found, warn user but continue with fallback
+      // Only use Electron fallback if SumatraPDF was NOT FOUND
+      // If SumatraPDF exists but printing failed, throw the error (don't use fallback)
       if (errorMessage.includes('nicht gefunden')) {
-        console.warn('[Printer] ⚠ Using Electron fallback - may have rendering issues with label printers');
+        console.warn('[Printer] ⚠️ SumatraPDF not found - Using Electron fallback');
+        warnToRenderer('[Printer] ⚠️ SumatraPDF nicht gefunden - verwende Fallback-Methode. Dies kann zu leeren Seiten führen!');
+        
+        // Fall back to Electron method
+        console.log(`[Printer] Attempting to print with Electron fallback...`);
+        warnToRenderer(`[Printer] Attempting to print with Electron fallback...`);
+        await printPdfWithElectron(pdfPath, targetPrinter);
+        console.log('[Printer] ✅ Successfully printed with Electron fallback');
+        warnToRenderer('[Printer] ✅ Successfully printed with Electron fallback');
+        console.log(`[Printer] ----------------------------------------`);
+      } else {
+        // SumatraPDF exists but printing failed - this is a real error, don't use fallback
+        console.error('[Printer] ❌ SumatraPDF found but printing failed - NOT using Electron fallback');
+        warnToRenderer('[Printer] ❌ SumatraPDF printing failed - check printer connection!');
+        console.log(`[Printer] ----------------------------------------`);
+        throw sumatraError; // Re-throw the error
       }
-      
-      // Fall back to Electron method
-      await printPdfWithElectron(pdfPath, targetPrinter);
-      console.log('[Printer] ✓ Successfully printed with Electron fallback');
     }
   } catch (error) {
-    console.error('[Printer] All print methods failed:', error);
+    console.error('[Printer] ❌ All print methods failed:', error);
+    warnToRenderer(`[Printer] ❌ All print methods failed: ${error}`);
+    console.log(`[Printer] ----------------------------------------`);
     throw error;
   }
 }

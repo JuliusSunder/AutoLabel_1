@@ -9,6 +9,7 @@ import * as labelsRepo from '../database/repositories/labels';
 import { validateLabelCreation } from '../auth/auth-manager';
 import type { PrintJob } from '../../shared/types';
 import fs from 'node:fs';
+import { logToRenderer } from '../utils/renderer-logger';
 
 /**
  * Add labels to print queue without immediately printing
@@ -165,13 +166,20 @@ export async function startPrintJob(
  * Process a print job (print all labels)
  */
 async function processPrintJob(jobId: string): Promise<void> {
-  console.log(`[Print Queue] Processing print job: ${jobId}`);
+  console.log(`[Print Queue] ========================================`);
+  console.log(`[Print Queue] 🖨️ Processing print job: ${jobId}`);
+  logToRenderer(`[Print Queue] 🖨️ Starting print job...`);
 
   const job = printJobsRepo.getPrintJobById(jobId);
   if (!job) {
     console.error(`[Print Queue] Job not found: ${jobId}`);
+    logToRenderer(`[Print Queue] ❌ Job not found: ${jobId}`);
     return;
   }
+
+  console.log(`[Print Queue] Printer: ${job.printerName}`);
+  console.log(`[Print Queue] Labels to print: ${job.labelIds.length}`);
+  logToRenderer(`[Print Queue] Printer: ${job.printerName}, Labels: ${job.labelIds.length}`);
 
   // Update status to printing
   printJobsRepo.updatePrintJobStatus(jobId, 'printing');
@@ -184,10 +192,18 @@ async function processPrintJob(jobId: string): Promise<void> {
 
   for (const label of labels) {
     try {
-      console.debug(`[Print Queue] Printing label: ${label.id}`);
+      console.log(`[Print Queue] 🖨️ Printing label ${printedCount + 1}/${labels.length}: ${label.id}`);
+      logToRenderer(`[Print Queue] 🖨️ Printing label ${printedCount + 1}/${labels.length}...`);
+      console.log(`[Print Queue] Label path: ${label.outputPath}`);
+      console.log(`[Print Queue] Printer: ${job.printerName}`);
+      console.log(`[Print Queue] About to call printPdf()...`);
+      logToRenderer(`[Print Queue] Calling printPdf()...`);
 
       // Print the label
       await printPdf(label.outputPath, job.printerName);
+      
+      console.log(`[Print Queue] printPdf() returned successfully`);
+      logToRenderer(`[Print Queue] printPdf() returned successfully`);
 
       // Update item status
       printJobsRepo.updatePrintJobItemStatus(jobId, label.id, 'printed');
@@ -196,11 +212,13 @@ async function processPrintJob(jobId: string): Promise<void> {
       printedCount++;
       printJobsRepo.incrementPrintedCount(jobId);
 
-      console.debug(
-        `[Print Queue] Successfully printed ${printedCount}/${labels.length}`
+      console.log(
+        `[Print Queue] ✅ Successfully printed ${printedCount}/${labels.length}`
       );
+      logToRenderer(`[Print Queue] ✅ Successfully printed ${printedCount}/${labels.length}`);
     } catch (error) {
       console.error(`[Print Queue] Failed to print label ${label.id}:`, error);
+      logToRenderer(`[Print Queue] ❌ Failed to print label ${label.id}: ${error}`);
 
       const errorMsg =
         error instanceof Error ? error.message : 'Unknown error';
@@ -231,13 +249,16 @@ async function processPrintJob(jobId: string): Promise<void> {
 
   if (finalStatus === 'failed') {
     console.error(
-      `[Print Queue] Job ${jobId} FAILED: ${printedCount}/${labels.length} printed, ${errors.length} errors`
+      `[Print Queue] ❌ Job ${jobId} FAILED: ${printedCount}/${labels.length} printed, ${errors.length} errors`
     );
+    logToRenderer(`[Print Queue] ❌ Print job FAILED: ${printedCount}/${labels.length} printed`);
   } else {
     console.log(
-      `[Print Queue] Job ${jobId} completed successfully: ${printedCount}/${labels.length} printed`
+      `[Print Queue] ✅ Job ${jobId} completed successfully: ${printedCount}/${labels.length} printed`
     );
+    logToRenderer(`[Print Queue] ✅ Print job completed: ${printedCount}/${labels.length} printed`);
   }
+  console.log(`[Print Queue] ========================================`);
 }
 
 /**
