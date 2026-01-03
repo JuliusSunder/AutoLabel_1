@@ -96,30 +96,41 @@ async function createTestSubscription(email: string, plan: 'plus' | 'pro') {
 
     console.log('Database subscription created/updated:', subscription.id);
 
-    // Create license
-    const licenseKey = uuidv4();
-    const license = await prisma.license.upsert({
-      where: { 
-        userId_status: {
-          userId: user.id,
-          status: 'active',
-        }
-      },
-      update: {
-        plan,
-        expiresAt: new Date(stripeSubscription.current_period_end * 1000),
-      },
-      create: {
+    // Create or update license
+    // First, try to find an existing active license for this user
+    let license = await prisma.license.findFirst({
+      where: {
         userId: user.id,
-        licenseKey,
         status: 'active',
-        plan,
-        expiresAt: new Date(stripeSubscription.current_period_end * 1000),
       },
     });
 
-    console.log('License created/updated:', license.id);
-    console.log('License Key:', licenseKey);
+    if (license) {
+      // Update existing license
+      license = await prisma.license.update({
+        where: { id: license.id },
+        data: {
+          plan,
+          expiresAt: new Date(stripeSubscription.current_period_end * 1000),
+        },
+      });
+      console.log('License updated:', license.id);
+      console.log('License Key:', license.licenseKey);
+    } else {
+      // Create new license
+      const licenseKey = uuidv4();
+      license = await prisma.license.create({
+        data: {
+          userId: user.id,
+          licenseKey,
+          status: 'active',
+          plan,
+          expiresAt: new Date(stripeSubscription.current_period_end * 1000),
+        },
+      });
+      console.log('License created:', license.id);
+      console.log('License Key:', licenseKey);
+    }
 
     console.log('\n✅ Success!');
     console.log('\nTest Subscription Details:');
