@@ -16,6 +16,52 @@ function LoginForm() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendingVerification, setResendingVerification] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  // Check if user is already logged in
+  useEffect(() => {
+    let isMounted = true;
+    
+    const checkSession = async () => {
+      try {
+        const response = await fetch("/api/auth/session");
+        const data = await response.json();
+        
+        console.log("[Login] Auth check result:", data);
+        
+        if (!isMounted) return;
+        
+        if (data.user) {
+          // User is already logged in, redirect to dashboard
+          console.log("[Login] User is logged in, redirecting to dashboard");
+          setShouldRedirect(true);
+          return;
+        }
+        
+        console.log("[Login] No user session, showing login form");
+      } catch (error) {
+        console.error("[Login] Session check error:", error);
+      } finally {
+        if (isMounted) {
+          setCheckingSession(false);
+        }
+      }
+    };
+    
+    checkSession();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Separate effect for redirect to avoid race conditions
+  useEffect(() => {
+    if (shouldRedirect) {
+      router.replace("/dashboard");
+    }
+  }, [shouldRedirect, router]);
 
   useEffect(() => {
     if (searchParams.get("passwordReset") === "true") {
@@ -58,7 +104,7 @@ function LoginForm() {
       } else {
         setError(data.error || "Failed to send verification email.");
       }
-    } catch (err) {
+    } catch {
       setError("An error occurred. Please try again.");
     } finally {
       setResendingVerification(false);
@@ -104,12 +150,25 @@ function LoginForm() {
     }
   };
 
+  // Show loading while checking session
+  if (checkingSession) {
+    return (
+      <div className="py-20 min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        <Container>
+          <div className="text-center">
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </Container>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-20">
+    <div className="py-20 min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Container>
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+        <div className="mx-auto max-w-md">
+          <div className="mb-8 text-center">
+            <h1 className="mb-2 text-4xl font-bold text-gray-900">
               Sign In
             </h1>
             <p className="text-gray-600">
@@ -117,33 +176,23 @@ function LoginForm() {
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="p-8 bg-white rounded-2xl shadow-xl">
             <form onSubmit={handleSubmit} className="space-y-6">
               {success && (
-                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                <div className="px-4 py-3 text-green-700 bg-green-50 rounded-lg border border-green-200">
                   {success}
                 </div>
               )}
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  <p className="mb-2">{error}</p>
-                  {error.includes("verify") && email && (
-                    <button
-                      type="button"
-                      onClick={handleResendVerification}
-                      disabled={resendingVerification}
-                      className="text-sm text-red-700 underline hover:text-red-800 disabled:opacity-50"
-                    >
-                      {resendingVerification ? "Sending..." : "Resend verification email"}
-                    </button>
-                  )}
+                <div className="px-4 py-3 text-red-700 bg-red-50 rounded-lg border border-red-200">
+                  {error}
                 </div>
               )}
 
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                  className="block mb-2 text-sm font-medium text-gray-700"
                 >
                   Email
                 </label>
@@ -153,25 +202,37 @@ function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="your@email.com"
                 />
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex justify-between items-center mb-2">
                   <label
                     htmlFor="password"
                     className="block text-sm font-medium text-gray-700"
                   >
                     Password
                   </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    Forgot password?
-                  </Link>
+                  <div className="flex gap-3 items-center">
+                    {error.includes("verify") && email && (
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={resendingVerification}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                      >
+                        {resendingVerification ? "Sending..." : "Resend email"}
+                      </button>
+                    )}
+                    <Link
+                      href="/forgot-password"
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
                 </div>
                 <input
                   id="password"
@@ -179,7 +240,7 @@ function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="••••••••"
                 />
               </div>
@@ -194,11 +255,11 @@ function LoginForm() {
             </form>
 
             <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
+              <div className="flex absolute inset-0 items-center">
                 <div className="w-full border-t border-gray-300"></div>
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              <div className="flex relative justify-center text-sm">
+                <span className="px-2 text-gray-500 bg-white">Or continue with</span>
               </div>
             </div>
 
@@ -208,7 +269,7 @@ function LoginForm() {
                 signIn("google", { callbackUrl: "/dashboard" });
               }}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex gap-3 justify-center items-center px-4 py-3 w-full rounded-lg border border-gray-300 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -228,15 +289,15 @@ function LoginForm() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              <span className="text-gray-700 font-medium">Sign in with Google</span>
+              <span className="font-medium text-gray-700">Sign in with Google</span>
             </button>
 
             <div className="mt-6 text-center">
               <p className="text-gray-600">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
                   href="/register"
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="font-medium text-blue-600 hover:text-blue-700"
                 >
                   Sign up now
                 </Link>
@@ -251,7 +312,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-20 flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="flex justify-center items-center py-20 min-h-screen bg-gradient-to-b from-gray-50 to-white">Loading...</div>}>
       <LoginForm />
     </Suspense>
   );

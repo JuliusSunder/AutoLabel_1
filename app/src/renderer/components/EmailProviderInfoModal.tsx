@@ -3,7 +3,7 @@
  * Displays email provider compatibility information and setup instructions
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   EMAIL_PROVIDERS,
   getProvidersByCategory,
@@ -12,22 +12,31 @@ import {
 } from '../data/email-providers';
 import './EmailProviderInfoModal.css';
 
+export type EmailProviderTab = 'intro' | 'overview' | 'instructions';
+
 interface EmailProviderInfoModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectProvider?: (provider: EmailProviderInfo) => void;
+  initialTab?: EmailProviderTab; // Optional: specify which tab to open
 }
-
-type Tab = 'intro' | 'overview' | 'instructions';
 
 export function EmailProviderInfoModal({
   isOpen,
   onClose,
   onSelectProvider,
+  initialTab = 'intro',
 }: EmailProviderInfoModalProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('intro');
+  const [activeTab, setActiveTab] = useState<EmailProviderTab>(initialTab);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Update active tab when initialTab changes and modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   if (!isOpen) {
     return null;
@@ -60,7 +69,7 @@ export function EmailProviderInfoModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content provider-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>📧 Email-Anbieter Kompatibilität</h2>
+          <h2>📧 Email Provider Compatibility</h2>
           <button className="modal-close" onClick={onClose}>
             ✕
           </button>
@@ -72,19 +81,19 @@ export function EmailProviderInfoModal({
             className={`provider-tab ${activeTab === 'intro' ? 'active' : ''}`}
             onClick={() => setActiveTab('intro')}
           >
-            Was ist IMAP?
+            What is IMAP?
           </button>
           <button
             className={`provider-tab ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
-            Anbieter-Übersicht
+            Provider Overview
           </button>
           <button
             className={`provider-tab ${activeTab === 'instructions' ? 'active' : ''}`}
             onClick={() => setActiveTab('instructions')}
           >
-            Anleitungen
+            Instructions
           </button>
         </div>
 
@@ -92,55 +101,55 @@ export function EmailProviderInfoModal({
           {/* INTRO TAB */}
           {activeTab === 'intro' && (
             <div className="provider-intro">
-              <h3>Wie funktioniert AutoLabel?</h3>
+              <h3>How does AutoLabel work?</h3>
               <p>
-                AutoLabel benötigt Zugriff auf Ihre E-Mails, um automatisch Versandlabels von
-                Online-Marktplätzen (eBay, Amazon, etc.) zu erkennen und zu verarbeiten.
+                AutoLabel needs access to your emails to automatically detect and process shipping labels from
+                online marketplaces (eBay, Amazon, etc.).
               </p>
 
               <div className="info-section">
-                <h4>📥 Option 1: IMAP-Zugriff (Empfohlen)</h4>
+                <h4>📥 Option 1: IMAP Access (Recommended)</h4>
                 <p>
-                  <strong>Was ist IMAP?</strong> IMAP (Internet Message Access Protocol) ist ein
-                  Standard-Protokoll, mit dem Programme wie AutoLabel Ihre E-Mails vom Server
-                  abrufen können - ähnlich wie Outlook oder Thunderbird.
+                  <strong>What is IMAP?</strong> IMAP (Internet Message Access Protocol) is a
+                  standard protocol that allows programs like AutoLabel to retrieve your emails from the server
+                  - similar to Outlook or Thunderbird.
                 </p>
                 <ul>
-                  <li>✅ Direkte Verbindung zu Ihrem Postfach</li>
-                  <li>✅ Schnell und zuverlässig</li>
-                  <li>✅ Ihre E-Mails bleiben auf dem Server</li>
-                  <li>✅ Bei den meisten Anbietern kostenlos</li>
+                  <li>✅ Direct connection to your mailbox</li>
+                  <li>✅ Fast and reliable</li>
+                  <li>✅ Your emails stay on the server</li>
+                  <li>✅ Free with most providers</li>
                 </ul>
               </div>
 
               <div className="info-section">
-                <h4>🔄 Option 2: E-Mail-Weiterleitung</h4>
+                <h4>🔄 Option 2: Email Forwarding</h4>
                 <p>
-                  Falls Ihr Anbieter kein IMAP unterstützt, können Sie eingehende E-Mails
-                  automatisch an einen IMAP-fähigen Account weiterleiten lassen.
+                  If your provider doesn't support IMAP, you can automatically forward incoming emails
+                  to an IMAP-capable account.
                 </p>
                 <ul>
-                  <li>✅ Funktioniert mit fast allen Anbietern</li>
-                  <li>⚠️ Benötigt einen zweiten E-Mail-Account (z.B. Gmail)</li>
-                  <li>⚠️ Leichte Verzögerung durch Weiterleitung</li>
+                  <li>✅ Works with almost all providers</li>
+                  <li>⚠️ Requires a second email account (e.g., Gmail)</li>
+                  <li>⚠️ Slight delay due to forwarding</li>
                 </ul>
               </div>
 
               <div className="info-section security-note">
-                <h4>🔒 Ist das sicher?</h4>
+                <h4>🔒 Is this secure?</h4>
                 <p>
-                  Ja! AutoLabel speichert Ihre Zugangsdaten verschlüsselt auf Ihrem Computer.
-                  Bei vielen Anbietern (Gmail, Outlook) verwenden Sie ein spezielles "App-Passwort"
-                  statt Ihres Haupt-Passworts - so bleibt Ihr Account geschützt.
+                  Yes! AutoLabel stores your credentials encrypted on your computer.
+                  With many providers (Gmail, Outlook), you use a special "app password"
+                  instead of your main password - keeping your account protected.
                 </p>
               </div>
 
               <div className="info-section">
-                <h4>👉 Nächster Schritt</h4>
+                <h4>👉 Next Step</h4>
                 <p>
-                  Wechseln Sie zum Tab <strong>"Anbieter-Übersicht"</strong>, um zu sehen, ob Ihr
-                  E-Mail-Anbieter kompatibel ist, oder zu <strong>"Anleitungen"</strong> für
-                  Schritt-für-Schritt-Anleitungen.
+                  Switch to the <strong>"Provider Overview"</strong> tab to see if your
+                  email provider is compatible, or to <strong>"Instructions"</strong> for
+                  step-by-step guides.
                 </p>
               </div>
             </div>
@@ -153,7 +162,7 @@ export function EmailProviderInfoModal({
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="🔍 Anbieter suchen..."
+                  placeholder="🔍 Search providers..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -173,8 +182,8 @@ export function EmailProviderInfoModal({
                         <div className="provider-name">
                           <strong>{provider.name}</strong>
                           {provider.requiresAppPassword && (
-                            <span className="badge badge-warning" title="App-Passwort erforderlich">
-                              🔑 App-Passwort
+                            <span className="badge badge-warning" title="App password required">
+                              🔑 App Password
                             </span>
                           )}
                         </div>
@@ -182,9 +191,9 @@ export function EmailProviderInfoModal({
                           <button
                             className="btn btn-sm btn-primary"
                             onClick={() => handleSelectProvider(provider)}
-                            title="IMAP-Einstellungen übernehmen"
+                            title="Use IMAP settings"
                           >
-                            Verwenden
+                            Use
                           </button>
                         )}
                       </div>
@@ -198,7 +207,7 @@ export function EmailProviderInfoModal({
                                 <button
                                   className="btn-icon"
                                   onClick={() => handleCopyToClipboard(provider.imap!.host)}
-                                  title="Kopieren"
+                                  title="Copy"
                                 >
                                   📋
                                 </button>
@@ -211,7 +220,7 @@ export function EmailProviderInfoModal({
                             <div className="config-item">
                               <span className="config-label">TLS:</span>
                               <span className="config-value">
-                                {provider.imap.tls ? '✅ Aktiviert' : '❌ Deaktiviert'}
+                                {provider.imap.tls ? '✅ Enabled' : '❌ Disabled'}
                               </span>
                             </div>
                           </div>
@@ -275,7 +284,7 @@ export function EmailProviderInfoModal({
                               <div className="config-item">
                                 <span className="config-label">TLS:</span>
                                 <span className="config-value">
-                                  {provider.imap.tls ? '✅ Aktiviert' : '❌ Deaktiviert'}
+                                  {provider.imap.tls ? '✅ Enabled' : '❌ Disabled'}
                                 </span>
                               </div>
                             </div>
@@ -283,8 +292,8 @@ export function EmailProviderInfoModal({
                           {provider.notes && <p className="provider-notes">{provider.notes}</p>}
                           {provider.forwardingAvailable && (
                             <div className="provider-alternative">
-                              <strong>💡 Kostenlose Alternative:</strong> Richten Sie eine E-Mail-Weiterleitung
-                              zu einem kompatiblen Anbieter (z.B. Gmail, Web.de) ein.
+                              <strong>💡 Free Alternative:</strong> Set up email forwarding
+                              to a compatible provider (e.g., Gmail, Web.de).
                             </div>
                           )}
                         </div>
@@ -296,7 +305,7 @@ export function EmailProviderInfoModal({
 
               {filteredProviders.length === 0 && (
                 <div className="no-results">
-                  <p>Keine Anbieter gefunden für "{searchQuery}"</p>
+                  <p>No providers found for "{searchQuery}"</p>
                 </div>
               )}
             </div>
@@ -309,14 +318,14 @@ export function EmailProviderInfoModal({
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="🔍 Anbieter suchen..."
+                  placeholder="🔍 Search providers..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
 
               <p className="instructions-hint">
-                Klicken Sie auf einen Anbieter, um detaillierte Einrichtungsanleitungen zu sehen.
+                Click on a provider to see detailed setup instructions.
               </p>
 
               <div className="provider-accordion">
@@ -339,7 +348,7 @@ export function EmailProviderInfoModal({
                         {/* IMAP Setup Instructions */}
                         {provider.instructions.imapSetup && (
                           <div className="instruction-section">
-                            <h4>📥 IMAP einrichten</h4>
+                            <h4>📥 Set up IMAP</h4>
                             <ol className="instruction-steps">
                               {provider.instructions.imapSetup.map((step, index) => (
                                 <li key={index}>{step}</li>
@@ -347,7 +356,7 @@ export function EmailProviderInfoModal({
                             </ol>
                             {provider.imap && (
                               <div className="quick-config">
-                                <strong>Schnell-Konfiguration:</strong>
+                                <strong>Quick Configuration:</strong>
                                 <div className="quick-config-values">
                                   <code>Server: {provider.imap.host}</code>
                                   <code>Port: {provider.imap.port}</code>
@@ -358,7 +367,7 @@ export function EmailProviderInfoModal({
                                     className="btn btn-sm btn-primary"
                                     onClick={() => handleSelectProvider(provider)}
                                   >
-                                    Jetzt in AutoLabel verwenden
+                                    Use in AutoLabel now
                                   </button>
                                 )}
                               </div>
@@ -369,7 +378,7 @@ export function EmailProviderInfoModal({
                         {/* App Password Instructions */}
                         {provider.instructions.appPassword && (
                           <div className="instruction-section">
-                            <h4>🔑 App-Passwort erstellen</h4>
+                            <h4>🔑 Create App Password</h4>
                             <ol className="instruction-steps">
                               {provider.instructions.appPassword.map((step, index) => (
                                 <li key={index}>{step}</li>
@@ -381,10 +390,10 @@ export function EmailProviderInfoModal({
                         {/* Forwarding Instructions */}
                         {provider.instructions.forwarding && (
                           <div className="instruction-section">
-                            <h4>🔄 E-Mail-Weiterleitung einrichten</h4>
+                            <h4>🔄 Set up Email Forwarding</h4>
                             {provider.forwardingPaid && (
                               <div className="warning-box">
-                                ⚠️ Bei {provider.name} ist die E-Mail-Weiterleitung kostenpflichtig.
+                                ⚠️ Email forwarding is a paid feature with {provider.name}.
                               </div>
                             )}
                             <ol className="instruction-steps">
@@ -404,7 +413,7 @@ export function EmailProviderInfoModal({
                               rel="noopener noreferrer"
                               className="help-link"
                             >
-                              📖 Offizielle Hilfe von {provider.name} →
+                              📖 Official Help from {provider.name} →
                             </a>
                           </div>
                         )}
@@ -416,7 +425,7 @@ export function EmailProviderInfoModal({
 
               {filteredProviders.length === 0 && (
                 <div className="no-results">
-                  <p>Keine Anbieter gefunden für "{searchQuery}"</p>
+                  <p>No providers found for "{searchQuery}"</p>
                 </div>
               )}
             </div>
@@ -425,7 +434,7 @@ export function EmailProviderInfoModal({
 
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>
-            Schließen
+            Close
           </button>
         </div>
       </div>

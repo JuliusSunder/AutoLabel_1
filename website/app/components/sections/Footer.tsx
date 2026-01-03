@@ -62,21 +62,21 @@ export function Footer() {
 
           {/* Legal */}
           <div>
-            <h4 className="font-semibold mb-4">Rechtliches</h4>
+            <h4 className="font-semibold mb-4">Legal</h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/datenschutz" className="text-gray-400 hover:text-white transition-colors">
-                  Datenschutzerklärung
+                  Privacy Policy
                 </Link>
               </li>
               <li>
                 <Link href="/agb" className="text-gray-400 hover:text-white transition-colors">
-                  AGB
+                  Terms of Service
                 </Link>
               </li>
               <li>
                 <Link href="/impressum" className="text-gray-400 hover:text-white transition-colors">
-                  Impressum
+                  Imprint
                 </Link>
               </li>
             </ul>
@@ -97,9 +97,9 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Link href="/support" className="text-gray-400 hover:text-white transition-colors">
                   Support
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

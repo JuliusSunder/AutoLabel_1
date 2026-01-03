@@ -13,6 +13,7 @@ interface AccountModalProps {
   account: EmailAccount | null; // null = create mode, account = edit mode
   onClose: () => void;
   onSuccess: () => void;
+  onShowProviderInfo?: (tab?: 'intro' | 'overview' | 'instructions') => void; // Callback to open provider info modal with specific tab
   prefillData?: {
     host: string;
     port: number;
@@ -20,7 +21,7 @@ interface AccountModalProps {
   };
 }
 
-export function AccountModal({ isOpen, account, onClose, onSuccess, prefillData }: AccountModalProps) {
+export function AccountModal({ isOpen, account, onClose, onSuccess, onShowProviderInfo, prefillData }: AccountModalProps) {
   const api = useAutolabel();
   const isEditMode = account !== null;
 
@@ -39,6 +40,25 @@ export function AccountModal({ isOpen, account, onClose, onSuccess, prefillData 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Track if user is dragging (for text selection)
+  const handleMouseDown = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = () => {
+    setIsDragging(true);
+  };
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only close if:
+    // 1. Click was directly on the overlay (not a child element)
+    // 2. User didn't drag (no text selection)
+    if (e.target === e.currentTarget && !isDragging) {
+      onClose();
+    }
+  };
 
   // Initialize form data when account changes
   useEffect(() => {
@@ -165,7 +185,12 @@ export function AccountModal({ isOpen, account, onClose, onSuccess, prefillData 
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div 
+      className="modal-overlay" 
+      onClick={handleOverlayClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Email Account' : 'Add Email Account'}</h2>
@@ -182,7 +207,19 @@ export function AccountModal({ isOpen, account, onClose, onSuccess, prefillData 
           )}
 
           <div className="form-group">
-            <label>Account Name *</label>
+            <div className="label-with-action">
+              <label>Account Name *</label>
+              {onShowProviderInfo && (
+                <button
+                  type="button"
+                  className="btn-link btn-template"
+                  onClick={() => onShowProviderInfo('overview')}
+                  title="Use predefined settings for common email providers"
+                >
+                  📋 Use Template
+                </button>
+              )}
+            </div>
             <input
               type="text"
               className="form-control"
@@ -215,7 +252,7 @@ export function AccountModal({ isOpen, account, onClose, onSuccess, prefillData 
           </div>
 
           <div className="form-group">
-            <label>Username (Email) *</label>
+            <label>Email Address *</label>
             <input
               type="email"
               className="form-control"
@@ -226,12 +263,24 @@ export function AccountModal({ isOpen, account, onClose, onSuccess, prefillData 
           </div>
 
           <div className="form-group">
-            <label>Password *</label>
+            <div className="label-with-info">
+              <label>App-Password * <span className="label-hint">(not your login password!)</span></label>
+              {onShowProviderInfo && (
+                <button
+                  type="button"
+                  className="btn-info"
+                  onClick={() => onShowProviderInfo('instructions')}
+                  title="How to create an app password? Click here for instructions."
+                >
+                  ℹ️
+                </button>
+              )}
+            </div>
             <div className="password-input-wrapper">
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="form-control"
-                placeholder={isEditMode ? 'Leave unchanged' : 'Your password'}
+                placeholder={isEditMode ? 'Leave unchanged' : 'Your app-specific password'}
                 value={formData.password}
                 onChange={(e) => handleChange('password', e.target.value)}
               />
@@ -244,6 +293,9 @@ export function AccountModal({ isOpen, account, onClose, onSuccess, prefillData 
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
+            <p className="field-help-text">
+              Many email providers (Gmail, Outlook, etc.) require a special app password for IMAP access.
+            </p>
           </div>
 
           <div className="form-group">

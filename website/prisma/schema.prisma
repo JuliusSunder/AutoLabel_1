@@ -9,14 +9,15 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String?   // Optional for OAuth users
-  name          String?
-  emailVerified DateTime? // Email verification timestamp
-  image         String?   // Profile image from OAuth
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  password              String?   // Optional for OAuth users
+  name                  String?
+  emailVerified         DateTime? // Email verification timestamp
+  image                 String?   // Profile image from OAuth
+  hasCompletedOnboarding Boolean  @default(false) // Track if user has completed onboarding guide
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   subscriptions        Subscription[]
   licenses             License[]

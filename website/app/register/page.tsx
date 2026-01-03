@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
@@ -14,6 +14,52 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  // Check if user is already logged in
+  useEffect(() => {
+    let isMounted = true;
+    
+    const checkSession = async () => {
+      try {
+        const response = await fetch("/api/auth/session");
+        const data = await response.json();
+        
+        console.log("[Register] Auth check result:", data);
+        
+        if (!isMounted) return;
+        
+        if (data.user) {
+          // User is already logged in, redirect to dashboard
+          console.log("[Register] User is logged in, redirecting to dashboard");
+          setShouldRedirect(true);
+          return;
+        }
+        
+        console.log("[Register] No user session, showing register form");
+      } catch (error) {
+        console.error("[Register] Session check error:", error);
+      } finally {
+        if (isMounted) {
+          setCheckingSession(false);
+        }
+      }
+    };
+    
+    checkSession();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Separate effect for redirect to avoid race conditions
+  useEffect(() => {
+    if (shouldRedirect) {
+      router.replace("/dashboard");
+    }
+  }, [shouldRedirect, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +103,19 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-20">
+        <Container>
+          <div className="text-center">
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </Container>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-20">

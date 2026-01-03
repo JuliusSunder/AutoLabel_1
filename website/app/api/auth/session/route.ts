@@ -18,6 +18,8 @@ export async function GET() {
         email: true,
         name: true,
         password: true,
+        hasCompletedOnboarding: true,
+        createdAt: true,
         subscriptions: {
           where: { status: "active" },
           orderBy: { createdAt: "desc" },
@@ -42,6 +44,8 @@ export async function GET() {
           email: user.email,
           name: user.name,
           hasPassword: !!user.password,
+          hasCompletedOnboarding: user.hasCompletedOnboarding,
+          createdAt: user.createdAt.toISOString(),
           subscription: user.subscriptions[0] || null,
           license: user.licenses[0] || null,
         },

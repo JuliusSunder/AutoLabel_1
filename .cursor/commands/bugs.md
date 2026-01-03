@@ -1,9 +1,10 @@
 # bugs
 
-Beschreibung: Wenn du `/bugs` verwendest und danach mehrere Fehler/Probleme beschreibst, analysiere diese, teile sie in logische Gruppen auf und erstelle für jede Gruppe einen eigenständigen Textprompt. Jeder Prompt soll: 1) Das Problem klar beschreiben, 2) Einen allgemeinen (nicht zu spezifischen) Lösungsansatz enthalten, 3) Bereit sein, in einen neuen Chat kopiert zu werden. Die Prompts sollen unabhängig voneinander verständlich sein.
-
-Prompt-Template: "Analysiere die folgenden Fehler/Probleme, die der User beschrieben hat. Teile sie in logische Gruppen auf (z.B. nach Feature, nach Komponente, nach Fehlertyp). Für jede Gruppe erstelle einen Textprompt, der: 1) Das Problem klar beschreibt, 2) Einen allgemeinen (nicht zu spezifischen) Lösungsansatz enthält, 3) Bereit ist, in einen neuen Chat kopiert zu werden. Die Prompts sollen unabhängig voneinander verständlich sein. Formatiere jeden Prompt klar getrennt, damit der User sie einfach kopieren kann."
-
-Beispiel: Der User schreibt: "/bugs Login funktioniert nicht auf Windows 10, Label-Drucken schlägt fehl, Email-Scanning findet keine Emails, App stürzt beim Start ab"
+Beschreibung: teil die Fehler/Bugs/Errors die ich dir in dieser Nachricht genannt haben in 1 bis 3 Gruppen ein. Die Gruppen sollen sich nach dem Ort der Probleme, der Zusammengehörigkeit und der gemeinsamen Lösbarkeit richten. Wenn du dann sinnvolle Gruppen eingeteilt hast, erstelle zu jeder Gruppe einen reinen Textprompt, welcher folgende Kriterien erfüllt:
+- beschreibt die Probleme detailliert und gibt alle nötigen Informationen um die Probleme zu lösen
+- beinhaltet eventuelle Lösungsansätze die in der Vergangenheit des Projektes gescheitert sind
+- beinhaltet korrekte und passende Internetreserche zu den Problemen
+- wirkt eher inspirierend als anweisend, um dem neuen Agent/Chat einen eigenen Lösungsansatz erstellen zu lassen
+- kompatibel mit einem komplett neuen Agent/Chat, welchen ich erstellen werde und dem ich den Prompt geben werde
 
 This command will be available in chat with /bugs

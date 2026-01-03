@@ -12,6 +12,12 @@ if (started) {
   app.quit();
 }
 
+// Set Windows App User Model ID for proper icon display
+// This ensures Windows correctly identifies the app and displays the right icon
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.autolabel.app');
+}
+
 // Initialize crash reporter
 crashReporter.start({
   productName: 'AutoLabel',

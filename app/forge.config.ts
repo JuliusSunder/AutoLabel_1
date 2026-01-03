@@ -14,7 +14,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     name: 'AutoLabel',
     executableName: 'autolabel',
-    icon: './icons/icon_256x256', // Electron Forge will add .ico/.icns automatically
+    icon: './icons/icon', // Electron Forge will add .ico/.icns automatically
     appCopyright: 'Copyright © 2025 JuliusSunder',
     appBundleId: 'com.autolabel.app',
     // Include external tools (SumatraPDF, ImageMagick, Ghostscript) as extra resources

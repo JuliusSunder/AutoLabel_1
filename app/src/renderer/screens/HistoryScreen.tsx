@@ -10,7 +10,7 @@ import { toast } from '../hooks/useToast';
 import { SaleCard } from '../components/SaleCard';
 import { AccountSidebar } from '../components/AccountSidebar';
 import { AccountModal } from '../components/AccountModal';
-import { EmailProviderInfoModal } from '../components/EmailProviderInfoModal';
+import { EmailProviderInfoModal, type EmailProviderTab } from '../components/EmailProviderInfoModal';
 import { EmptyState } from '../components/EmptyState';
 import {
   DropdownMenu,
@@ -83,6 +83,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   const [showModal, setShowModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<EmailAccount | null>(null);
   const [showProviderInfoModal, setShowProviderInfoModal] = useState(false);
+  const [providerInfoInitialTab, setProviderInfoInitialTab] = useState<EmailProviderTab>('intro');
   const [prefillData, setPrefillData] = useState<{ host: string; port: number; tls: boolean } | undefined>(undefined);
 
   useEffect(() => {
@@ -385,7 +386,8 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     setShowModal(true);
   };
 
-  const handleShowProviderInfo = () => {
+  const handleShowProviderInfo = (tab: EmailProviderTab = 'intro') => {
+    setProviderInfoInitialTab(tab);
     setShowProviderInfoModal(true);
   };
 
@@ -526,26 +528,26 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
             <DropdownMenu onOpenChange={(open) => setTimeDropdownOpen(open)}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="filter-select" style={{ justifyContent: 'space-between' }}>
-                  {filters.timeFilter === 'all' ? 'Alle Zeiten' :
-                   filters.timeFilter === 'today' ? 'Heute' :
-                   filters.timeFilter === 'thisWeek' ? 'Diese Woche' :
-                   filters.timeFilter === 'last7Days' ? 'Letzte 7 Tage' :
-                   filters.timeFilter === 'thisMonth' ? 'Dieser Monat' :
-                   filters.timeFilter === 'lastMonth' ? 'Letzter Monat' :
-                   filters.timeFilter === 'last30Days' ? 'Letzte 30 Tage' : 'Alle Zeiten'}
+                  {filters.timeFilter === 'all' ? 'All Time' :
+                   filters.timeFilter === 'today' ? 'Today' :
+                   filters.timeFilter === 'thisWeek' ? 'This Week' :
+                   filters.timeFilter === 'last7Days' ? 'Last 7 Days' :
+                   filters.timeFilter === 'thisMonth' ? 'This Month' :
+                   filters.timeFilter === 'lastMonth' ? 'Last Month' :
+                   filters.timeFilter === 'last30Days' ? 'Last 30 Days' : 'All Time'}
                   <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${timeDropdownOpen ? 'rotate-180' : ''}`} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
                 <div className="px-2 py-1 space-y-2">
                   {[
-                    { value: 'all', label: 'Alle Zeiten' },
-                    { value: 'today', label: 'Heute' },
-                    { value: 'thisWeek', label: 'Diese Woche' },
-                    { value: 'last7Days', label: 'Letzte 7 Tage' },
-                    { value: 'thisMonth', label: 'Dieser Monat' },
-                    { value: 'lastMonth', label: 'Letzter Monat' },
-                    { value: 'last30Days', label: 'Letzte 30 Tage' },
+                    { value: 'all', label: 'All Time' },
+                    { value: 'today', label: 'Today' },
+                    { value: 'thisWeek', label: 'This Week' },
+                    { value: 'last7Days', label: 'Last 7 Days' },
+                    { value: 'thisMonth', label: 'This Month' },
+                    { value: 'lastMonth', label: 'Last Month' },
+                    { value: 'last30Days', label: 'Last 30 Days' },
                   ].map((option) => (
                     <div key={option.value} className="flex items-center gap-2">
                       <Checkbox
@@ -578,8 +580,8 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="filter-select" style={{ justifyContent: 'space-between' }}>
                   {filters.shippingCompanies.length > 0 
-                    ? `${filters.shippingCompanies.length} ausgewählt` 
-                    : 'Versanddienstleister'}
+                    ? `${filters.shippingCompanies.length} selected` 
+                    : 'Shipping Companies'}
                   <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${carrierDropdownOpen ? 'rotate-180' : ''}`} />
                 </Button>
               </DropdownMenuTrigger>
@@ -713,7 +715,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                           sales.filter(s => s.hasAttachments).every(s => selectedIds.has(s.id))}
                   onChange={handleSelectAll}
                 />
-                <span>Alle auswählen</span>
+                <span>Select all</span>
               </label>
             )}
             
@@ -852,6 +854,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
           setPrefillData(undefined);
         }}
         onSuccess={handleModalSuccess}
+        onShowProviderInfo={handleShowProviderInfo}
         prefillData={prefillData}
       />
 
@@ -859,6 +862,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
         isOpen={showProviderInfoModal}
         onClose={() => setShowProviderInfoModal(false)}
         onSelectProvider={handleSelectProvider}
+        initialTab={providerInfoInitialTab}
       />
     </div>
   );

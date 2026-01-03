@@ -217,3 +217,90 @@
   background: #5a6268;
 }
 
+/* Label with Action/Info Styles */
+.label-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.label-with-action label {
+  margin-bottom: 0;
+}
+
+.label-with-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.label-with-info label {
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.label-hint {
+  font-weight: normal;
+  color: #e74c3c;
+  font-size: 0.85rem;
+}
+
+/* Template Button (Ghost-style) */
+.btn-link {
+  background: none;
+  border: none;
+  color: #3498db;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+  text-decoration: none;
+}
+
+.btn-link:hover {
+  background-color: rgba(52, 152, 219, 0.1);
+  color: #2980b9;
+}
+
+.btn-template {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Info Button */
+.btn-info {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.btn-info:hover {
+  background-color: rgba(52, 152, 219, 0.1);
+  opacity: 1;
+}
+
+/* Field Help Text */
+.field-help-text {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #6c757d;
+  font-style: italic;
+  line-height: 1.4;
+}
+

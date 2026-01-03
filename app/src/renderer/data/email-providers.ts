@@ -356,20 +356,20 @@ export function getCategoryInfo(category: EmailProviderInfo['category']): {
     case 'compatible':
       return {
         icon: '✅',
-        label: 'Direkt kompatibel',
-        description: 'IMAP kostenlos verfügbar - empfohlen!',
+        label: 'Directly Compatible',
+        description: 'IMAP available for free - recommended!',
       };
     case 'forwarding':
       return {
         icon: '🔄',
-        label: 'Weiterleitung möglich',
-        description: 'Kein direkter IMAP-Zugriff, aber E-Mail-Weiterleitung verfügbar',
+        label: 'Forwarding Available',
+        description: 'No direct IMAP access, but email forwarding available',
       };
     case 'paid':
       return {
         icon: '💰',
-        label: 'Kostenpflichtig kompatibel',
-        description: 'IMAP oder Weiterleitung nur mit kostenpflichtigem Tarif verfügbar',
+        label: 'Paid Compatible',
+        description: 'IMAP or forwarding only available with paid plan',
       };
   }
 }

@@ -19,7 +19,7 @@ export function AccountStatus() {
       setSession(sessionData);
     } catch (error) {
       console.error('Failed to load session:', error);
-      toast.error('Fehler beim Laden der Account-Informationen');
+      toast.error('Failed to load account information');
     } finally {
       setIsLoading(false);
     }
@@ -30,7 +30,7 @@ export function AccountStatus() {
   }, []);
 
   const handleLogout = async () => {
-    if (!confirm('Möchten Sie sich wirklich abmelden?')) {
+    if (!confirm('Do you really want to log out?')) {
       return;
     }
 
@@ -38,13 +38,13 @@ export function AccountStatus() {
 
     try {
       await window.autolabel.auth.logout();
-      toast.success('Erfolgreich abgemeldet');
+      toast.success('Successfully logged out');
       
       // Trigger a custom event that AuthGuard will listen to
       window.dispatchEvent(new CustomEvent('auth:logout'));
     } catch (error) {
       console.error('Logout failed:', error);
-      toast.error('Fehler beim Abmelden');
+      toast.error('Failed to log out');
       setIsLoggingOut(false);
     }
   };
@@ -57,7 +57,7 @@ export function AccountStatus() {
       await window.autolabel.shell.openExternal(`${websiteUrl}/#pricing`);
     } catch (error) {
       console.error('Failed to open pricing page:', error);
-      toast.error('Fehler beim Öffnen der Pricing-Seite');
+      toast.error('Failed to open pricing page');
     }
   };
 
@@ -79,7 +79,7 @@ export function AccountStatus() {
   if (!session) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-600">Keine Account-Informationen verfügbar</p>
+        <p className="text-gray-600">No account information available</p>
       </div>
     );
   }
@@ -108,7 +108,7 @@ export function AccountStatus() {
           <button
             onClick={handleRefresh}
             className="text-gray-400 hover:text-gray-600 transition-colors"
-            title="Aktualisieren"
+            title="Refresh"
           >
             <svg
               className="w-5 h-5"
@@ -130,7 +130,7 @@ export function AccountStatus() {
       <div className="p-6 space-y-4">
         {/* Plan Info */}
         <div>
-          <label className="text-sm font-medium text-gray-700">Aktueller Plan</label>
+          <label className="text-sm font-medium text-gray-700">Current Plan</label>
           <div className="mt-2 flex items-center justify-between">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${planColor}`}>
               {planName}
@@ -140,7 +140,7 @@ export function AccountStatus() {
                 onClick={handleUpgrade}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
-                Upgraden →
+                Upgrade →
               </button>
             )}
           </div>
@@ -150,17 +150,17 @@ export function AccountStatus() {
         <div>
           <label className="text-sm font-medium text-gray-700">Status</label>
           <p className="mt-1 text-sm text-gray-900">
-            {session.subscription.status === 'active' ? 'Aktiv' : session.subscription.status}
+            {session.subscription.status === 'active' ? 'Active' : session.subscription.status}
           </p>
         </div>
 
         {/* Device Info */}
         {session.device && (
           <div>
-            <label className="text-sm font-medium text-gray-700">Gerät</label>
+            <label className="text-sm font-medium text-gray-700">Device</label>
             <p className="mt-1 text-sm text-gray-600">
-              Registriert am{' '}
-              {new Date(session.device.registeredAt).toLocaleDateString('de-DE')}
+              Registered on{' '}
+              {new Date(session.device.registeredAt).toLocaleDateString('en-US')}
             </p>
           </div>
         )}
@@ -181,9 +181,9 @@ export function AccountStatus() {
                   clipRule="evenodd"
                 />
               </svg>
-              {plan === 'free' && '10 Labels pro Monat'}
-              {plan === 'plus' && '60 Labels pro Monat'}
-              {plan === 'pro' && 'Unbegrenzte Labels'}
+              {plan === 'free' && '10 Labels per month'}
+              {plan === 'plus' && '60 Labels per month'}
+              {plan === 'pro' && 'Unlimited Labels'}
             </li>
             <li className="flex items-center">
               <svg
@@ -197,7 +197,7 @@ export function AccountStatus() {
                   clipRule="evenodd"
                 />
               </svg>
-              Batch-Druck
+              Batch Printing
             </li>
             {plan !== 'free' && (
               <li className="flex items-center">
@@ -225,7 +225,7 @@ export function AccountStatus() {
           disabled={isLoggingOut}
           className="w-full bg-white text-gray-700 border border-gray-300 py-2 px-4 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isLoggingOut ? 'Abmelden...' : 'Abmelden'}
+          {isLoggingOut ? 'Logging out...' : 'Log out'}
         </button>
       </div>
     </div>

@@ -1,17 +1,10 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/app/lib/auth";
-
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  
-  if (!session?.user) {
-    redirect("/login");
-  }
-
+  // Remove server-side redirect to avoid infinite loop
+  // Client-side check is handled in the page component
   return <>{children}</>;
 }
 

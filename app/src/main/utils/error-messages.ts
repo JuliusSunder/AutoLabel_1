@@ -1,6 +1,6 @@
 /**
  * User-Friendly Error Messages
- * Translates technical errors into German user-friendly messages
+ * Translates technical errors into user-friendly messages
  */
 
 /**
@@ -25,24 +25,24 @@ export enum ErrorType {
 }
 
 /**
- * Error message templates in German
+ * Error message templates
  */
 const ERROR_MESSAGES: Record<ErrorType, string> = {
-  [ErrorType.EMAIL_CONNECTION]: 'Verbindung zum E-Mail-Server konnte nicht hergestellt werden. Bitte überprüfen Sie Ihre Internetverbindung und die Server-Einstellungen.',
-  [ErrorType.EMAIL_AUTH]: 'E-Mail-Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre E-Mail-Adresse und Ihr Passwort.',
-  [ErrorType.EMAIL_TIMEOUT]: 'Die Verbindung zum E-Mail-Server hat zu lange gedauert. Bitte versuchen Sie es später erneut.',
-  [ErrorType.FILE_NOT_FOUND]: 'Die angeforderte Datei wurde nicht gefunden.',
-  [ErrorType.FILE_READ]: 'Die Datei konnte nicht gelesen werden. Möglicherweise ist sie beschädigt oder wird von einem anderen Programm verwendet.',
-  [ErrorType.FILE_WRITE]: 'Die Datei konnte nicht gespeichert werden. Bitte überprüfen Sie die Schreibrechte und den verfügbaren Speicherplatz.',
-  [ErrorType.PRINTER_NOT_FOUND]: 'Der ausgewählte Drucker wurde nicht gefunden. Bitte überprüfen Sie, ob der Drucker eingeschaltet und mit dem Computer verbunden ist.',
-  [ErrorType.PRINTER_ERROR]: 'Beim Drucken ist ein Fehler aufgetreten. Bitte überprüfen Sie den Drucker und versuchen Sie es erneut.',
-  [ErrorType.DATABASE_ERROR]: 'Ein Datenbankfehler ist aufgetreten. Bitte starten Sie die Anwendung neu.',
-  [ErrorType.NETWORK_ERROR]: 'Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.',
-  [ErrorType.INVALID_PDF]: 'Die PDF-Datei ist ungültig oder beschädigt.',
-  [ErrorType.INVALID_CONFIG]: 'Die Konfiguration ist ungültig. Bitte überprüfen Sie Ihre Einstellungen.',
-  [ErrorType.PERMISSION_DENIED]: 'Zugriff verweigert. Bitte überprüfen Sie die Berechtigungen.',
-  [ErrorType.USAGE_LIMIT_EXCEEDED]: 'Monatslimit erreicht. Bitte upgraden Sie Ihren Plan für mehr Labels.',
-  [ErrorType.UNKNOWN]: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
+  [ErrorType.EMAIL_CONNECTION]: 'Could not connect to email server. Please check your internet connection and server settings.',
+  [ErrorType.EMAIL_AUTH]: 'Email authentication failed. Please check your email address and password.',
+  [ErrorType.EMAIL_TIMEOUT]: 'Connection to email server timed out. Please try again later.',
+  [ErrorType.FILE_NOT_FOUND]: 'The requested file was not found.',
+  [ErrorType.FILE_READ]: 'Could not read the file. It may be corrupted or in use by another program.',
+  [ErrorType.FILE_WRITE]: 'Could not save the file. Please check write permissions and available disk space.',
+  [ErrorType.PRINTER_NOT_FOUND]: 'The selected printer was not found. Please check if the printer is turned on and connected to the computer.',
+  [ErrorType.PRINTER_ERROR]: 'An error occurred while printing. Please check the printer and try again.',
+  [ErrorType.DATABASE_ERROR]: 'A database error occurred. Please restart the application.',
+  [ErrorType.NETWORK_ERROR]: 'Network error. Please check your internet connection.',
+  [ErrorType.INVALID_PDF]: 'The PDF file is invalid or corrupted.',
+  [ErrorType.INVALID_CONFIG]: 'The configuration is invalid. Please check your settings.',
+  [ErrorType.PERMISSION_DENIED]: 'Access denied. Please check permissions.',
+  [ErrorType.USAGE_LIMIT_EXCEEDED]: 'Monthly limit reached. Please upgrade your plan for more labels.',
+  [ErrorType.UNKNOWN]: 'An unexpected error occurred. Please try again.',
 };
 
 /**
@@ -58,10 +58,12 @@ function detectErrorType(error: Error | unknown): ErrorType {
 
   // Usage limit errors - check first as they have specific messages
   if (
+    message.includes('monthly limit') ||
+    message.includes('limit reached') ||
+    message.includes('labels used') ||
+    message.includes('upgrade') ||
     message.includes('monatslimit') ||
-    message.includes('limit erreicht') ||
-    message.includes('labels verwendet') ||
-    message.includes('upgraden sie')
+    message.includes('limit erreicht')
   ) {
     return ErrorType.USAGE_LIMIT_EXCEEDED;
   }
@@ -151,7 +153,8 @@ function isUserFriendlyMessage(message: string): boolean {
   const lowerMessage = message.toLowerCase();
   
   // Usage limit messages with specific counts are already user-friendly
-  if (lowerMessage.includes('monatslimit erreicht') && lowerMessage.includes('von')) {
+  if ((lowerMessage.includes('monthly limit') || lowerMessage.includes('monatslimit')) && 
+      (lowerMessage.includes('of') || lowerMessage.includes('von'))) {
     return true;
   }
   
@@ -236,21 +239,21 @@ export function getSuggestedAction(error: Error | unknown): string {
   const errorType = detectErrorType(error);
 
   const suggestions: Record<ErrorType, string> = {
-    [ErrorType.EMAIL_CONNECTION]: 'Überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.',
-    [ErrorType.EMAIL_AUTH]: 'Gehen Sie zu den Einstellungen und überprüfen Sie Ihre E-Mail-Zugangsdaten.',
-    [ErrorType.EMAIL_TIMEOUT]: 'Warten Sie einen Moment und versuchen Sie es dann erneut.',
-    [ErrorType.FILE_NOT_FOUND]: 'Stellen Sie sicher, dass die Datei noch existiert.',
-    [ErrorType.FILE_READ]: 'Schließen Sie andere Programme, die diese Datei verwenden könnten.',
-    [ErrorType.FILE_WRITE]: 'Überprüfen Sie den verfügbaren Speicherplatz auf Ihrer Festplatte.',
-    [ErrorType.PRINTER_NOT_FOUND]: 'Überprüfen Sie, ob der Drucker eingeschaltet und verbunden ist.',
-    [ErrorType.PRINTER_ERROR]: 'Überprüfen Sie den Drucker-Status und versuchen Sie es erneut.',
-    [ErrorType.DATABASE_ERROR]: 'Starten Sie die Anwendung neu. Wenn das Problem weiterhin besteht, kontaktieren Sie den Support.',
-    [ErrorType.NETWORK_ERROR]: 'Überprüfen Sie Ihre Internetverbindung.',
-    [ErrorType.INVALID_PDF]: 'Versuchen Sie, das Label erneut zu generieren.',
-    [ErrorType.INVALID_CONFIG]: 'Überprüfen Sie Ihre Einstellungen in den Einstellungen.',
-    [ErrorType.PERMISSION_DENIED]: 'Starten Sie die Anwendung mit Administratorrechten.',
-    [ErrorType.USAGE_LIMIT_EXCEEDED]: 'Upgraden Sie Ihren Plan auf Plus oder Pro für mehr Labels pro Monat.',
-    [ErrorType.UNKNOWN]: 'Versuchen Sie es erneut. Wenn das Problem weiterhin besteht, kontaktieren Sie den Support.',
+    [ErrorType.EMAIL_CONNECTION]: 'Check your internet connection and try again.',
+    [ErrorType.EMAIL_AUTH]: 'Go to Settings and verify your email credentials.',
+    [ErrorType.EMAIL_TIMEOUT]: 'Wait a moment and try again.',
+    [ErrorType.FILE_NOT_FOUND]: 'Make sure the file still exists.',
+    [ErrorType.FILE_READ]: 'Close other programs that might be using this file.',
+    [ErrorType.FILE_WRITE]: 'Check available disk space on your hard drive.',
+    [ErrorType.PRINTER_NOT_FOUND]: 'Check if the printer is turned on and connected.',
+    [ErrorType.PRINTER_ERROR]: 'Check printer status and try again.',
+    [ErrorType.DATABASE_ERROR]: 'Restart the application. If the problem persists, contact support.',
+    [ErrorType.NETWORK_ERROR]: 'Check your internet connection.',
+    [ErrorType.INVALID_PDF]: 'Try to regenerate the label.',
+    [ErrorType.INVALID_CONFIG]: 'Check your settings in the Settings menu.',
+    [ErrorType.PERMISSION_DENIED]: 'Run the application with administrator rights.',
+    [ErrorType.USAGE_LIMIT_EXCEEDED]: 'Upgrade your plan to Plus or Pro for more labels per month.',
+    [ErrorType.UNKNOWN]: 'Try again. If the problem persists, contact support.',
   };
 
   return suggestions[errorType];

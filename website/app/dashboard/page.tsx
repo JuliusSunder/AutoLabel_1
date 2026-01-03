@@ -6,24 +6,21 @@ import { signOut } from "next-auth/react";
 import { Container } from "@/app/components/ui/Container";
 import { Button } from "@/app/components/ui/Button";
 import { BackButton } from "@/app/components/ui/BackButton";
-import { Download, Key, CreditCard, LogOut, Copy, Check, TrendingUp, Lock } from "lucide-react";
+import { OnboardingGuide } from "@/app/components/OnboardingGuide";
+import { Download, CreditCard, LogOut, TrendingUp, Lock, Rocket } from "lucide-react";
 
 interface UserData {
   id: string;
   email: string;
   name: string | null;
   hasPassword: boolean;
+  hasCompletedOnboarding: boolean;
+  createdAt: string;
   subscription: {
     plan: string;
     status: string;
     billingPeriod: string | null;
     currentPeriodEnd: string | null;
-  } | null;
-  license: {
-    licenseKey: string;
-    plan: string;
-    status: string;
-    expiresAt: string | null;
   } | null;
 }
 
@@ -31,41 +28,76 @@ export default function DashboardPage() {
   const router = useRouter();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [settingPassword, setSettingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch("/api/auth/session");
+        const data = await response.json();
+
+        console.log("[Dashboard] Auth check result:", data);
+
+        if (!isMounted) return;
+
+        if (!data.user) {
+          console.log("[Dashboard] No user session, redirecting to login");
+          setShouldRedirect(true);
+          return;
+        }
+
+        console.log("[Dashboard] User is logged in, showing dashboard");
+        setUserData(data.user);
+      } catch (error) {
+        console.error("[Dashboard] Error fetching user data:", error);
+        if (isMounted) {
+          setShouldRedirect(true);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
     fetchUserData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  // Separate effect for redirect to avoid race conditions
+  useEffect(() => {
+    if (shouldRedirect) {
+      router.replace("/login");
+    }
+  }, [shouldRedirect, router]);
 
   const fetchUserData = async () => {
     try {
       const response = await fetch("/api/auth/session");
       const data = await response.json();
 
+      console.log("[Dashboard] Refresh auth check result:", data);
+
       if (!data.user) {
-        router.push("/login");
+        console.log("[Dashboard] No user session after refresh");
+        router.replace("/login");
         return;
       }
 
       setUserData(data.user);
     } catch (error) {
-      console.error("Error fetching user data:", error);
-      router.push("/login");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCopyLicenseKey = () => {
-    if (userData?.license?.licenseKey) {
-      navigator.clipboard.writeText(userData.license.licenseKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      console.error("[Dashboard] Error fetching user data:", error);
     }
   };
 
@@ -173,6 +205,31 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCompleteOnboarding = async () => {
+    try {
+      const response = await fetch("/api/user/complete-onboarding", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        console.error("Failed to complete onboarding");
+        return;
+      }
+
+      // Reload user data to update hasCompletedOnboarding flag
+      await fetchUserData();
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+    }
+  };
+
+  const handleSkipOnboarding = () => {
+    setShowOnboarding(false);
+  };
+
+  // Check if user should see onboarding
+  const shouldShowOnboarding = userData && !userData.hasCompletedOnboarding;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-20">
@@ -190,7 +247,6 @@ export default function DashboardPage() {
   }
 
   const planName = userData.subscription?.plan || "free";
-  const hasActiveLicense = userData.license?.status === "active";
   const isPremium = planName !== "free";
 
   // Usage Limits basierend auf Plan
@@ -226,6 +282,36 @@ export default function DashboardPage() {
               Sign Out
             </Button>
           </div>
+
+          {/* Onboarding Card - Only for new users */}
+          {shouldShowOnboarding && (
+            <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl shadow-xl p-8 mb-6 text-white">
+              <div className="flex items-center gap-3 mb-4">
+                <Rocket className="w-8 h-8" />
+                <h2 className="text-2xl font-bold">Willkommen bei AutoLabel! 🎉</h2>
+              </div>
+              <p className="mb-6 text-green-50 text-lg">
+                Du bist neu hier? Lass uns gemeinsam AutoLabel einrichten! 
+                Unser interaktiver Guide führt dich Schritt für Schritt durch die Einrichtung.
+              </p>
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={() => setShowOnboarding(true)}
+                  variant="outline"
+                  className="bg-white text-green-600 hover:bg-green-50 border-0 font-semibold px-6 py-3 text-lg"
+                >
+                  <Rocket className="w-5 h-5 mr-2" />
+                  Guide me through
+                </Button>
+                <button
+                  onClick={handleCompleteOnboarding}
+                  className="text-green-100 hover:text-white underline text-sm transition-colors"
+                >
+                  Ich kenne mich schon aus
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Plan Card */}
           <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
@@ -337,67 +423,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* License Card - Nur für Premium User */}
-          {isPremium && hasActiveLicense && userData.license && (
-            <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Key className="w-6 h-6 text-green-600" />
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Your License
-                </h2>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    License Key
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={userData.license.licenseKey}
-                      readOnly
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"
-                    />
-                    <Button
-                      onClick={handleCopyLicenseKey}
-                      variant="outline"
-                      className="flex items-center gap-2"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Plan</p>
-                    <p className="font-medium uppercase">
-                      {userData.license.plan}
-                    </p>
-                  </div>
-                  {userData.license.expiresAt && (
-                    <div>
-                      <p className="text-sm text-gray-600">Valid Until</p>
-                      <p className="font-medium">
-                        {new Date(
-                          userData.license.expiresAt
-                        ).toLocaleDateString("en-US")}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Password Set Card - Nur für OAuth User ohne Passwort */}
           {!userData.hasPassword && (
@@ -469,17 +494,12 @@ export default function DashboardPage() {
                 : "Download the latest version of AutoLabel and install it on your computer."}
             </p>
             <button
-              onClick={handleDownload}
+              onClick={() => router.push("/download")}
               className="inline-flex items-center justify-center px-6 py-3 bg-white text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300 shadow-lg"
             >
               <Download className="w-5 h-5 mr-2" />
               Download App
             </button>
-            {planName === "free" && (
-              <p className="mt-4 text-sm text-blue-200">
-                Note: No license key is required for the Free plan.
-              </p>
-            )}
             {!userData.hasPassword && (
               <p className="mt-3 text-sm text-blue-200">
                 ⚠️ Bitte setzen Sie zuerst ein Passwort (siehe oben), um sich in der Desktop-App anmelden zu können.
@@ -493,6 +513,16 @@ export default function DashboardPage() {
           </div>
         </div>
       </Container>
+
+      {/* Onboarding Guide Modal */}
+      {showOnboarding && (
+        <OnboardingGuide
+          onComplete={handleCompleteOnboarding}
+          onSkip={handleSkipOnboarding}
+          userEmail={userData.email}
+          hasPassword={userData.hasPassword}
+        />
+      )}
     </div>
   );
 }

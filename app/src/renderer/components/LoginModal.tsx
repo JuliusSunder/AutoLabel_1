@@ -21,7 +21,7 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
 
     if (!email || !password) {
       console.log('[LoginModal] Email or password missing');
-      toast.error('Bitte geben Sie Email und Passwort ein');
+      toast.error('Please enter email and password');
       return;
     }
 
@@ -35,7 +35,7 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
 
       if (result.success) {
         console.log('[LoginModal] Login successful');
-        toast.success('Login erfolgreich!');
+        toast.success('Login successful!');
         
         if (onLoginSuccess) {
           console.log('[LoginModal] Calling onLoginSuccess callback');
@@ -43,11 +43,11 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
         }
       } else {
         console.log('[LoginModal] Login failed:', result.error);
-        toast.error(result.error || 'Login fehlgeschlagen');
+        toast.error(result.error || 'Login failed');
       }
     } catch (error) {
       console.error('[LoginModal] Login error:', error);
-      toast.error('Ein unerwarteter Fehler ist aufgetreten');
+      toast.error('An unexpected error occurred');
     } finally {
       console.log('[LoginModal] Setting isLoading to false');
       setIsLoading(false);
@@ -62,7 +62,7 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
       await window.autolabel.shell.openExternal(`${websiteUrl}/forgot-password`);
     } catch (error) {
       console.error('Failed to open forgot password page:', error);
-      toast.error('Fehler beim Öffnen der Passwort-Wiederherstellung');
+      toast.error('Failed to open password recovery page');
     }
   };
 
@@ -73,7 +73,19 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
       await window.autolabel.shell.openExternal(`${websiteUrl}/register`);
     } catch (error) {
       console.error('Failed to open registration page:', error);
-      toast.error('Fehler beim Öffnen der Registrierungsseite');
+      toast.error('Failed to open registration page');
+    }
+  };
+
+  const handleTermsClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      // Open terms page in default browser
+      const websiteUrl = import.meta.env.VITE_WEBSITE_URL || 'http://localhost:3000';
+      await window.autolabel.shell.openExternal(`${websiteUrl}/agb`);
+    } catch (error) {
+      console.error('Failed to open terms page:', error);
+      toast.error('Failed to open terms of service');
     }
   };
 
@@ -82,7 +94,7 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">AutoLabel</h2>
-          <p className="text-gray-600 mt-2">Melden Sie sich an, um fortzufahren</p>
+          <p className="text-gray-600 mt-2">Sign in to continue</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -96,7 +108,7 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="ihre@email.de"
+              placeholder="your@email.com"
               disabled={isLoading}
               required
             />
@@ -104,7 +116,7 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Passwort
+              Password
             </label>
             <input
               id="password"
@@ -123,7 +135,7 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
             disabled={isLoading}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isLoading ? 'Anmelden...' : 'Anmelden'}
+            {isLoading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
 
@@ -133,28 +145,31 @@ export function LoginModal({ onLoginSuccess }: LoginModalProps) {
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
             disabled={isLoading}
           >
-            Passwort vergessen?
+            Forgot password?
           </button>
 
           <div className="text-sm text-gray-600">
-            Noch kein Account?{' '}
+            Don't have an account?{' '}
             <button
               onClick={handleCreateAccount}
               className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
               disabled={isLoading}
             >
-              Jetzt registrieren
+              Sign up now
             </button>
           </div>
         </div>
 
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-500 text-center">
-            Durch die Anmeldung stimmen Sie unseren{' '}
-            <a href="#" className="text-blue-600 hover:underline">
-              Nutzungsbedingungen
-            </a>{' '}
-            zu.
+            By signing in, you agree to our{' '}
+            <a 
+              href="#" 
+              onClick={handleTermsClick}
+              className="text-blue-600 hover:underline cursor-pointer"
+            >
+              Terms of Service
+            </a>
           </p>
         </div>
       </div>

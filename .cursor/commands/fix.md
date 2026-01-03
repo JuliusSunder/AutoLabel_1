@@ -6,4 +6,4 @@ Beispiel: "Fix Label Preview: Thumbnails fehlen"
 
 This command will be available in chat with /fix
 
-This command will be available in chat with /fix
+

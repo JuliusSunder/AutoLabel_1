@@ -97,7 +97,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 color: 'hsl(var(--foreground))',
               }}
             >
-              Ein Fehler ist aufgetreten
+              An error occurred
             </h2>
             <p
               style={{
@@ -107,7 +107,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 lineHeight: 1.6,
               }}
             >
-              Ein unerwarteter Fehler ist aufgetreten. Bitte laden Sie die Anwendung neu.
+              An unexpected error occurred. Please reload the application.
             </p>
             {isDevelopment && this.state.error && (
               <div
@@ -164,7 +164,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
               }}
             >
-              App neu laden
+              Reload App
             </button>
           </div>
         </div>
