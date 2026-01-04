@@ -9,7 +9,7 @@
 
 export interface Sale {
   id: string;
-  emailId: string; // For deduplication
+  emailId: string; // For deduplication (also used for file hash in folder scans)
   date: string; // ISO date string
   platform?: string; // e.g., "eBay", "Amazon", detected if possible
   shippingCompany?: string; // e.g., "DHL", "Hermes", "DPD", "GLS", "UPS"
@@ -20,6 +20,7 @@ export interface Sale {
   createdAt: string; // ISO timestamp
   hasAttachments?: boolean; // Whether sale has label attachments
   accountId?: string; // Email account this sale came from
+  folderId?: string; // Watched folder this sale came from
 }
 
 export interface EmailAccount {
@@ -31,6 +32,14 @@ export interface EmailAccount {
   password: string; // Decrypted password (only in main process)
   tls: boolean;
   isActive: boolean; // Whether account is active for scanning
+  createdAt: string;
+}
+
+export interface WatchedFolder {
+  id: string;
+  name: string; // User-defined name (e.g., "Downloads", "Vinted Labels")
+  folderPath: string; // Absolute path to the folder
+  isActive: boolean; // Whether folder is active for scanning
   createdAt: string;
 }
 
@@ -132,7 +141,7 @@ export interface AutoLabelAPI {
     refreshVinted: () => Promise<ScanResult>;
   };
   sales: {
-    list: (params: { fromDate?: string; toDate?: string; accountId?: string }) => Promise<Sale[]>;
+    list: (params: { fromDate?: string; toDate?: string; accountId?: string; folderId?: string }) => Promise<Sale[]>;
     get: (id: string) => Promise<Sale | null>;
   };
   labels: {
@@ -173,6 +182,14 @@ export interface AutoLabelAPI {
     toggle: (id: string) => Promise<void>;
     test: (config: { host: string; port: number; username: string; password: string; tls: boolean }) => Promise<{ success: boolean; error?: string }>;
     testExisting: (accountId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  folders: {
+    list: () => Promise<WatchedFolder[]>;
+    create: (data: Omit<WatchedFolder, 'id' | 'createdAt'>) => Promise<WatchedFolder>;
+    update: (id: string, data: Partial<Omit<WatchedFolder, 'id' | 'createdAt'>>) => Promise<void>;
+    delete: (id: string) => Promise<void>;
+    toggle: (id: string) => Promise<void>;
+    chooseFolder: () => Promise<{ success: boolean; path?: string; error?: string }>;
   };
   log: {
     error: (message: string, error?: any, context?: Record<string, any>) => Promise<{ success: boolean; error?: string }>;
@@ -260,6 +277,7 @@ export interface SaleRow {
   metadata_json: string | null;
   created_at: string;
   account_id: string | null;
+  folder_id: string | null;
 }
 
 export interface AttachmentRow {
@@ -279,6 +297,14 @@ export interface EmailAccountRow {
   username: string;
   encrypted_password: string;
   tls: number; // SQLite stores booleans as 0/1
+  is_active: number; // SQLite stores booleans as 0/1
+  created_at: string;
+}
+
+export interface WatchedFolderRow {
+  id: string;
+  name: string;
+  folder_path: string;
   is_active: number; // SQLite stores booleans as 0/1
   created_at: string;
 }

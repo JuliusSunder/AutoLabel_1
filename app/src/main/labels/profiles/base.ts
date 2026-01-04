@@ -32,12 +32,13 @@ export interface LabelProfile {
    * Process the label file
    * @param filePath - Path to the input label file
    * @param context - Optional context (shipping company, platform, etc.)
-   * @returns Path to the processed label file (temp location)
+   * @returns Path to the processed label file (temp location) and optionally detected shipping company
    */
   process(filePath: string, context?: ProfileContext): Promise<{
     outputPath: string;
     width: number;
     height: number;
+    detectedShippingCompany?: string;
   }>;
 }
 

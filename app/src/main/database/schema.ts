@@ -357,6 +357,49 @@ export function runMigrations(db: Database.Database): void {
     db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(7);
   }
 
+  // Migration 8: Create watched_folders table
+  if (version < 8) {
+    console.log('[Schema] Creating watched_folders table...');
+    
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS watched_folders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        folder_path TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    console.log('[Schema] Created watched_folders table');
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(8);
+  }
+
+  // Migration 9: Add folder_id column to sales table
+  if (version < 9) {
+    console.log('[Schema] Adding folder_id column to sales table...');
+    
+    // Check if column already exists (safe migration)
+    const tableInfo = db.pragma('table_info(sales)');
+    const hasFolderId = tableInfo.some(
+      (col: any) => col.name === 'folder_id'
+    );
+    
+    if (!hasFolderId) {
+      db.exec('ALTER TABLE sales ADD COLUMN folder_id TEXT');
+      console.log('[Schema] Added folder_id column to sales table');
+    }
+    
+    // Create index for folder_id lookups
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_sales_folder_id 
+      ON sales(folder_id)
+    `);
+    
+    console.log('[Schema] Created index on sales.folder_id');
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(9);
+  }
+
   // Future migrations go here:
-  // if (version < 8) { ... }
+  // if (version < 10) { ... }
 }

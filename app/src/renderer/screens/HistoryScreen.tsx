@@ -21,7 +21,7 @@ import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Label } from '../../components/ui/label';
 import { ChevronDown, Search, X, Loader2, Inbox, Mail } from 'lucide-react';
-import type { Sale, EmailAccount } from '../../shared/types';
+import type { Sale, EmailAccount, WatchedFolder } from '../../shared/types';
 import type { EmailProviderInfo } from '../data/email-providers';
 import './HistoryScreen.css';
 
@@ -49,8 +49,11 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   const api = useAutolabel();
   const [sales, setSales] = useState<Sale[]>([]);
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [folders, setFolders] = useState<WatchedFolder[]>([]);
   const [salesCounts, setSalesCounts] = useState<Record<string, number>>({});
+  const [folderSalesCounts, setFolderSalesCounts] = useState<Record<string, number>>({});
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -82,19 +85,30 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<EmailAccount | null>(null);
+  const [editingFolder, setEditingFolder] = useState<WatchedFolder | null>(null);
   const [showProviderInfoModal, setShowProviderInfoModal] = useState(false);
   const [providerInfoInitialTab, setProviderInfoInitialTab] = useState<EmailProviderTab>('intro');
   const [prefillData, setPrefillData] = useState<{ host: string; port: number; tls: boolean } | undefined>(undefined);
 
   useEffect(() => {
     loadAccounts();
+    loadFolders();
     loadSales();
+
+    // Listen for custom events that trigger sales reload
+    const handleSalesUpdate = () => {
+      console.log('[HistoryScreen] Received sales-updated event, reloading sales...');
+      loadSales();
+    };
+
+    window.addEventListener('sales:updated', handleSalesUpdate);
+    return () => window.removeEventListener('sales:updated', handleSalesUpdate);
   }, []);
 
   useEffect(() => {
-    // Reload sales when account filter or date filters change
+    // Reload sales when account/folder filter or date filters change
     loadSales();
-  }, [selectedAccountId, filters, debouncedSearchQuery]);
+  }, [selectedAccountId, selectedFolderId, filters, debouncedSearchQuery]);
 
   // Debounce search query
   useEffect(() => {
@@ -121,6 +135,25 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
       setSalesCounts(counts);
     } catch (err) {
       console.error('Failed to load accounts:', err);
+    }
+  };
+
+  const loadFolders = async () => {
+    try {
+      const result = await api.folders.list();
+      setFolders(result);
+      
+      // Calculate sales counts per folder
+      const allSales = await api.sales.list({});
+      const counts: Record<string, number> = {};
+      for (const sale of allSales) {
+        if (sale.folderId) {
+          counts[sale.folderId] = (counts[sale.folderId] || 0) + 1;
+        }
+      }
+      setFolderSalesCounts(counts);
+    } catch (err) {
+      console.error('Failed to load folders:', err);
     }
   };
 
@@ -196,6 +229,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
       
       const result = await api.sales.list({
         accountId: selectedAccountId || undefined,
+        folderId: selectedFolderId || undefined,
         fromDate: dateRange.fromDate,
         toDate: dateRange.toDate,
       });
@@ -364,7 +398,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     setScanResult(null);
 
     try {
-      const result = await api.scan.refreshVinted();
+      const result = await api.scan.start();
       setScanResult(result);
       console.log('Scan completed:', result);
       
@@ -382,7 +416,14 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
   // Account management handlers
   const handleAddAccount = () => {
     setEditingAccount(null);
+    setEditingFolder(null);
     setPrefillData(undefined);
+    setShowModal(true);
+  };
+
+  const handleAddFolder = () => {
+    setEditingAccount(null);
+    setEditingFolder(null);
     setShowModal(true);
   };
 
@@ -409,6 +450,16 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     const account = accounts.find((a) => a.id === accountId);
     if (account) {
       setEditingAccount(account);
+      setEditingFolder(null);
+      setShowModal(true);
+    }
+  };
+
+  const handleEditFolder = (folderId: string) => {
+    const folder = folders.find((f) => f.id === folderId);
+    if (folder) {
+      setEditingFolder(folder);
+      setEditingAccount(null);
       setShowModal(true);
     }
   };
@@ -426,6 +477,19 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     }
   };
 
+  const handleDeleteFolder = async (folderId: string) => {
+    try {
+      await api.folders.delete(folderId);
+      await loadFolders();
+      await loadSales();
+    } catch (err) {
+      console.error('Failed to delete folder:', err);
+      toast.error('Failed to delete folder', {
+        description: err instanceof Error ? err.message : 'Unknown error'
+      });
+    }
+  };
+
   const handleToggleAccount = async (accountId: string) => {
     try {
       await api.accounts.toggle(accountId);
@@ -438,8 +502,21 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     }
   };
 
+  const handleToggleFolder = async (folderId: string) => {
+    try {
+      await api.folders.toggle(folderId);
+      await loadFolders();
+    } catch (err) {
+      console.error('Failed to toggle folder:', err);
+      toast.error('Failed to toggle folder', {
+        description: err instanceof Error ? err.message : 'Unknown error'
+      });
+    }
+  };
+
   const handleModalSuccess = async () => {
     await loadAccounts();
+    await loadFolders();
     await loadSales();
   };
 
@@ -459,13 +536,21 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
     <div className="screen history-screen-container">
       <AccountSidebar
         accounts={accounts}
+        folders={folders}
         selectedAccountId={selectedAccountId}
+        selectedFolderId={selectedFolderId}
         salesCounts={salesCounts}
+        folderSalesCounts={folderSalesCounts}
         onSelectAccount={setSelectedAccountId}
+        onSelectFolder={setSelectedFolderId}
         onAddAccount={handleAddAccount}
+        onAddFolder={handleAddFolder}
         onEditAccount={handleEditAccount}
+        onEditFolder={handleEditFolder}
         onDeleteAccount={handleDeleteAccount}
+        onDeleteFolder={handleDeleteFolder}
         onToggleAccount={handleToggleAccount}
+        onToggleFolder={handleToggleFolder}
         onShowProviderInfo={handleShowProviderInfo}
       />
 
@@ -849,8 +934,11 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
       <AccountModal
         isOpen={showModal}
         account={editingAccount}
+        folder={editingFolder}
         onClose={() => {
           setShowModal(false);
+          setEditingAccount(null);
+          setEditingFolder(null);
           setPrefillData(undefined);
         }}
         onSuccess={handleModalSuccess}

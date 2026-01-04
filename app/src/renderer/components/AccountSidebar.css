@@ -170,3 +170,31 @@
   opacity: 0.8;
 }
 
+/* Source Sections */
+.source-section {
+  margin-top: 0.5rem;
+}
+
+.source-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #e9ecef;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Folder-specific styles */
+.folder-item .account-info {
+  cursor: pointer;
+}
+
+.folder-path {
+  font-family: 'Courier New', monospace;
+  font-size: 0.7rem;
+}
+

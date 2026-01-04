@@ -9,6 +9,7 @@ import { registerLabelsHandlers } from './labels';
 import { registerAttachmentsHandlers } from './attachments';
 import { registerPrintHandlers } from './print';
 import { registerConfigHandlers } from './config';
+import { registerFolderHandlers } from './folders';
 import { registerLoggingHandlers } from './logging';
 import { registerAuthHandlers } from './auth';
 import { registerShellHandlers } from './shell';
@@ -29,6 +30,7 @@ export function registerAllHandlers(): void {
   registerAttachmentsHandlers();
   registerPrintHandlers();
   registerConfigHandlers();
+  registerFolderHandlers();
 
   console.log('[IPC] All IPC handlers registered successfully');
 }

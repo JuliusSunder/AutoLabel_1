@@ -875,9 +875,10 @@ export const vintedProfile: LabelProfile = {
    * Detect if this is a Vinted label
    */
   async detect(filePath: string, context?: ProfileContext): Promise<boolean> {
-    // Check context first
-    if (context?.platform?.toLowerCase() === 'vinted') {
-      console.log('[Vinted Profile] Detected via platform context');
+    // Check context first - match both "Vinted" and "Vinted/Kleiderkreisel"
+    const platformLower = context?.platform?.toLowerCase() || '';
+    if (platformLower.includes('vinted') || platformLower.includes('kleiderkreisel')) {
+      console.log('[Vinted Profile] Detected via platform context:', context?.platform);
       return true;
     }
 
@@ -901,11 +902,32 @@ export const vintedProfile: LabelProfile = {
     outputPath: string;
     width: number;
     height: number;
+    detectedShippingCompany?: string;
   }> {
-    const shippingCompany = context?.shippingCompany || '';
-    logToRenderer(`[Vinted Profile] Processing label for: ${shippingCompany}`);
-    
     const ext = path.extname(filePath).toLowerCase();
+    let shippingCompany = context?.shippingCompany || '';
+    let detectedShippingCompany: string | undefined;
+    
+    // If no shipping company provided, try to detect from PDF
+    if (!shippingCompany && ext === '.pdf') {
+      logToRenderer('[Vinted Profile] No shipping company in context, attempting PDF detection...');
+      try {
+        const { detectShippingCompanyFromPDF } = await import('../../email/pdf-analyzer');
+        const detected = await detectShippingCompanyFromPDF(filePath);
+        if (detected) {
+          shippingCompany = detected;
+          detectedShippingCompany = detected; // Store for return
+          logToRenderer(`[Vinted Profile] ✅ Detected shipping company from PDF: ${shippingCompany}`);
+        } else {
+          logToRenderer('[Vinted Profile] ⚠️ Could not detect shipping company from PDF');
+        }
+      } catch (error) {
+        errorToRenderer('[Vinted Profile] ❌ Error detecting shipping company from PDF:', error);
+      }
+    }
+    
+    logToRenderer(`[Vinted Profile] Processing label for: ${shippingCompany || 'Unknown (using standard processing)'}`);
+    
     let outputPath: string;
 
     // Route to carrier-specific processing
@@ -924,7 +946,7 @@ export const vintedProfile: LabelProfile = {
         outputPath = await processHermesImage(filePath);
       }
     } else {
-      // GLS, DHL: Crop upper half, rotate 90° counter-clockwise
+      // GLS, DHL, or Unknown: Crop upper half, rotate 90° counter-clockwise (standard Vinted processing)
       if (ext === '.pdf') {
         outputPath = await processStandardPdf(filePath);
       } else {
@@ -936,6 +958,7 @@ export const vintedProfile: LabelProfile = {
       outputPath,
       width: TARGET_SIZE_MM.width,
       height: TARGET_SIZE_MM.height,
+      detectedShippingCompany, // Return detected shipping company if found
     };
   },
 };

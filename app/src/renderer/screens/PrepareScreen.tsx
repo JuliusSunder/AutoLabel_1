@@ -135,6 +135,10 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
       setPreparedLabels(result);
       console.log('Labels prepared:', result);
 
+      // Trigger sales update event so HistoryScreen can reload
+      // (in case shipping companies were detected during preparation)
+      window.dispatchEvent(new CustomEvent('sales:updated'));
+
       // Load thumbnails for prepared labels
       const thumbMap = new Map<string, string>();
       for (const label of result) {

@@ -188,6 +188,7 @@ export const genericProfile: LabelProfile = {
     outputPath: string;
     width: number;
     height: number;
+    detectedShippingCompany?: string;
   }> {
     const ext = path.extname(filePath).toLowerCase();
 
@@ -203,6 +204,7 @@ export const genericProfile: LabelProfile = {
       outputPath,
       width: TARGET_SIZE_MM.width,
       height: TARGET_SIZE_MM.height,
+      detectedShippingCompany: undefined, // Generic profile doesn't detect shipping company
     };
   },
 };

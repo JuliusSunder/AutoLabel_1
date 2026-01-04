@@ -13,6 +13,8 @@ import * as attachmentsRepo from '../database/repositories/attachments';
 import { generateId, getDatabase } from '../database/db';
 import { loadConfig, updateConfig } from '../config';
 import { getActiveAccounts, getEmailAccount } from '../database/repositories/email-accounts';
+import { getActiveFolders } from '../database/repositories/watched-folders';
+import { scanAllFolders } from '../folder/folder-scanner';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ScanResult, EmailAccount } from '../../shared/types';
@@ -151,16 +153,17 @@ async function scanSingleAccount(account: EmailAccount, scanDays: number): Promi
 }
 
 /**
- * Scan mailbox for new sales (multi-account support)
+ * Scan mailbox for new sales (multi-account support + folder support)
  * @param accountId - Optional account ID to scan only one account
  */
 export async function scanMailbox(accountId?: string): Promise<ScanResult> {
-  console.log('[Scanner] Starting email scan...');
+  console.log('[Scanner] Starting scan (Email Accounts + Folders)...');
 
   const config = loadConfig();
   const scanDays = config.scanDays || 30;
 
   let accounts: EmailAccount[];
+  let folders = getActiveFolders(); // Always scan all active folders
 
   if (accountId) {
     // Scan specific account
@@ -178,9 +181,9 @@ export async function scanMailbox(accountId?: string): Promise<ScanResult> {
     // Scan all active accounts
     accounts = getActiveAccounts(true); // decrypt passwords
     
-    // Fallback: Check for legacy IMAP config
-    if (accounts.length === 0 && config.imap) {
-      console.log('[Scanner] No email accounts found, using legacy IMAP config');
+    // Fallback: Check for legacy IMAP config (only if no folders either)
+    if (accounts.length === 0 && folders.length === 0 && config.imap) {
+      console.log('[Scanner] No email accounts or folders found, but legacy IMAP config detected');
       return {
         scannedCount: 0,
         newSales: 0,
@@ -188,33 +191,57 @@ export async function scanMailbox(accountId?: string): Promise<ScanResult> {
       };
     }
 
-    if (accounts.length === 0) {
+    console.log(`[Scanner] Found ${accounts.length} active email account(s)`);
+    console.log(`[Scanner] Found ${folders.length} active watched folder(s)`);
+
+    if (accounts.length === 0 && folders.length === 0) {
       return {
         scannedCount: 0,
         newSales: 0,
-        errors: ['No active email accounts configured. Please add an email account first.'],
+        errors: ['No active email accounts or folders configured. Please add an email account or folder first.'],
       };
     }
-
-    console.log(`[Scanner] Scanning ${accounts.length} active account(s)`);
   }
 
-  // Scan each account with error isolation
+  // Scan email accounts
   let totalScanned = 0;
   let totalNewSales = 0;
   const allErrors: string[] = [];
 
-  for (const account of accounts) {
-    const result = await scanSingleAccount(account, scanDays);
-    totalScanned += result.scannedCount;
-    totalNewSales += result.newSales;
-    allErrors.push(...result.errors);
+  if (accounts.length > 0) {
+    console.log(`\n[Scanner] ========================================`);
+    console.log(`[Scanner] SCANNING EMAIL ACCOUNTS (${accounts.length})`);
+    console.log(`[Scanner] ========================================`);
+
+    for (const account of accounts) {
+      const result = await scanSingleAccount(account, scanDays);
+      totalScanned += result.scannedCount;
+      totalNewSales += result.newSales;
+      allErrors.push(...result.errors);
+    }
+  }
+
+  // Scan folders (only if not scanning a specific account)
+  if (!accountId && folders.length > 0) {
+    console.log(`\n[Scanner] ========================================`);
+    console.log(`[Scanner] SCANNING WATCHED FOLDERS (${folders.length})`);
+    console.log(`[Scanner] ========================================`);
+
+    const folderResult = await scanAllFolders(folders);
+    totalScanned += folderResult.scannedCount;
+    totalNewSales += folderResult.newSales;
+    allErrors.push(...folderResult.errors);
   }
 
   // Update last scan date
   updateConfig({ lastScanDate: new Date().toISOString() });
 
-  console.log(`[Scanner] Multi-account scan complete. Total: ${totalNewSales} new sales from ${totalScanned} emails.`);
+  console.log(`\n[Scanner] ========================================`);
+  console.log(`[Scanner] COMPLETE SCAN SUMMARY`);
+  console.log(`  Total items checked: ${totalScanned}`);
+  console.log(`  New sales created: ${totalNewSales}`);
+  console.log(`  Errors: ${allErrors.length}`);
+  console.log(`[Scanner] ========================================\n`);
 
   return {
     scannedCount: totalScanned,

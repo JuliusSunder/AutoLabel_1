@@ -17,6 +17,7 @@ export async function normalizeLabel(
   profileId: string;
   width: number;
   height: number;
+  detectedShippingCompany?: string;
 }> {
   console.log('[Normalizer] Normalizing label:', inputPath);
   if (context?.shippingCompany) {
@@ -43,5 +44,6 @@ export async function normalizeLabel(
     profileId,
     width: result.width,
     height: result.height,
+    detectedShippingCompany: result.detectedShippingCompany,
   };
 }

@@ -61,7 +61,10 @@ export async function prepareLabels(
         continue;
       }
       
-      logToRenderer(`[Processor] Sale info - Shipping: ${sale.shippingCompany}, Platform: ${sale.platform}`);
+      logToRenderer(`[Processor] 📋 Sale info:`);
+      logToRenderer(`   - Sale ID: ${sale.id}`);
+      logToRenderer(`   - Platform: ${sale.platform || 'None'}`);
+      logToRenderer(`   - Shipping Company: ${sale.shippingCompany || 'None (will attempt detection)'}`);
 
       // Get attachments
       const attachments = attachmentsRepo.getAttachmentsBySaleId(saleId);
@@ -75,8 +78,9 @@ export async function prepareLabels(
       const selectedAttachment = 
         attachments.find(att => att.type === 'pdf') || attachments[0];
       
-      logToRenderer(`[Processor] Found ${attachments.length} attachment(s), using: ${selectedAttachment.id} (type: ${selectedAttachment.type})`);
-      logToRenderer(`[Processor] Attachment path: ${selectedAttachment.localPath}`);
+      logToRenderer(`[Processor] 📎 Selected attachment: ${selectedAttachment.type.toUpperCase()}`);
+      logToRenderer(`   - Found ${attachments.length} attachment(s), using: ${selectedAttachment.id}`);
+      logToRenderer(`   - Path: ${selectedAttachment.localPath}`);
 
       try {
         logToRenderer(`[Processor] 🔄 Processing attachment: ${selectedAttachment.id}`);
@@ -87,6 +91,22 @@ export async function prepareLabels(
           platform: sale.platform,
           saleId: sale.id,
         });
+
+        // If shipping company was detected during normalization, update the sale
+        if (normalized.detectedShippingCompany && !sale.shippingCompany) {
+          logToRenderer(`[Processor] 🚚 Detected shipping company during normalization: ${normalized.detectedShippingCompany}`);
+          logToRenderer(`[Processor] 💾 Updating sale ${sale.id} with shipping company...`);
+          salesRepo.updateSale(sale.id, {
+            shippingCompany: normalized.detectedShippingCompany,
+          });
+          // Update local sale object for footer rendering
+          sale.shippingCompany = normalized.detectedShippingCompany;
+          logToRenderer(`[Processor] ✅ Sale updated successfully with shipping company: ${normalized.detectedShippingCompany}`);
+        } else if (sale.shippingCompany) {
+          logToRenderer(`[Processor] ℹ️  Sale already has shipping company: ${sale.shippingCompany}`);
+        } else {
+          logToRenderer(`[Processor] ⚠️  No shipping company detected for this sale`);
+        }
 
         // Step 2: Add footer (only if footerConfig is provided)
         // Keep format as-is for best quality

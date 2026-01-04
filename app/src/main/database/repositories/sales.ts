@@ -22,6 +22,7 @@ function rowToSale(row: SaleRow): Sale {
     metadata: row.metadata_json ? JSON.parse(row.metadata_json) : undefined,
     createdAt: row.created_at,
     accountId: row.account_id || undefined,
+    folderId: row.folder_id || undefined,
   };
 }
 
@@ -36,8 +37,8 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
   const stmt = db.prepare(`
     INSERT INTO sales (
       id, email_id, date, platform, shipping_company, product_number, 
-      item_title, buyer_ref, metadata_json, created_at, account_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      item_title, buyer_ref, metadata_json, created_at, account_id, folder_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -51,13 +52,24 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
     data.buyerRef || null,
     data.metadata ? JSON.stringify(data.metadata) : null,
     createdAt,
-    data.accountId || null
+    data.accountId || null,
+    data.folderId || null
   );
 
+  // Return the sale with actual values (convert null to undefined for consistency)
   return {
-    ...data,
     id,
+    emailId: data.emailId,
+    date: data.date,
+    platform: data.platform || undefined,
+    shippingCompany: data.shippingCompany || undefined,
+    productNumber: data.productNumber || undefined,
+    itemTitle: data.itemTitle || undefined,
+    buyerRef: data.buyerRef || undefined,
+    metadata: data.metadata,
     createdAt,
+    accountId: data.accountId || undefined,
+    folderId: data.folderId || undefined,
   };
 }
 
@@ -82,12 +94,65 @@ export function getSaleByEmailId(emailId: string): Sale | null {
 }
 
 /**
- * List sales with optional date and account filtering
+ * Update a sale's fields
+ */
+export function updateSale(
+  id: string,
+  updates: Partial<Omit<Sale, 'id' | 'createdAt'>>
+): void {
+  const db = getDatabase();
+  
+  const fields: string[] = [];
+  const values: any[] = [];
+  
+  if (updates.platform !== undefined) {
+    fields.push('platform = ?');
+    values.push(updates.platform);
+  }
+  if (updates.shippingCompany !== undefined) {
+    fields.push('shipping_company = ?');
+    values.push(updates.shippingCompany);
+  }
+  if (updates.productNumber !== undefined) {
+    fields.push('product_number = ?');
+    values.push(updates.productNumber);
+  }
+  if (updates.itemTitle !== undefined) {
+    fields.push('item_title = ?');
+    values.push(updates.itemTitle);
+  }
+  if (updates.buyerRef !== undefined) {
+    fields.push('buyer_ref = ?');
+    values.push(updates.buyerRef);
+  }
+  if (updates.metadata !== undefined) {
+    fields.push('metadata_json = ?');
+    values.push(JSON.stringify(updates.metadata));
+  }
+  
+  if (fields.length === 0) {
+    return; // Nothing to update
+  }
+  
+  values.push(id); // Add ID for WHERE clause
+  
+  const stmt = db.prepare(`
+    UPDATE sales 
+    SET ${fields.join(', ')}
+    WHERE id = ?
+  `);
+  
+  stmt.run(...values);
+}
+
+/**
+ * List sales with optional date, account, and folder filtering
  */
 export function listSales(params: {
   fromDate?: string;
   toDate?: string;
   accountId?: string;
+  folderId?: string;
 }): Sale[] {
   const db = getDatabase();
   let query = `
@@ -112,6 +177,11 @@ export function listSales(params: {
   if (params.accountId) {
     query += ' AND s.account_id = ?';
     queryParams.push(params.accountId);
+  }
+
+  if (params.folderId) {
+    query += ' AND s.folder_id = ?';
+    queryParams.push(params.folderId);
   }
 
   query += ' ORDER BY s.date DESC, s.created_at DESC';
@@ -152,6 +222,28 @@ export function getSalesCountByAccount(): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const row of rows) {
     counts[row.account_id] = row.count;
+  }
+  
+  return counts;
+}
+
+/**
+ * Get sales count per folder
+ */
+export function getSalesCountByFolder(): Record<string, number> {
+  const db = getDatabase();
+  const stmt = db.prepare(`
+    SELECT 
+      COALESCE(folder_id, 'null') as folder_id, 
+      COUNT(*) as count 
+    FROM sales 
+    GROUP BY folder_id
+  `);
+  const rows = stmt.all() as Array<{ folder_id: string; count: number }>;
+  
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    counts[row.folder_id] = row.count;
   }
   
   return counts;

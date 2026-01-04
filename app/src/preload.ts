@@ -47,6 +47,14 @@ const autolabelAPI: AutoLabelAPI = {
     test: (config) => ipcRenderer.invoke('accounts:test', config),
     testExisting: (accountId) => ipcRenderer.invoke('accounts:testExisting', accountId),
   },
+  folders: {
+    list: () => ipcRenderer.invoke('folders:list'),
+    create: (data) => ipcRenderer.invoke('folders:create', data),
+    update: (id, data) => ipcRenderer.invoke('folders:update', id, data),
+    delete: (id) => ipcRenderer.invoke('folders:delete', id),
+    toggle: (id) => ipcRenderer.invoke('folders:toggle', id),
+    chooseFolder: () => ipcRenderer.invoke('folders:chooseFolder'),
+  },
   log: {
     error: (message, error, context) => ipcRenderer.invoke('log:error', message, error, context),
     warn: (message, context) => ipcRenderer.invoke('log:warn', message, context),
