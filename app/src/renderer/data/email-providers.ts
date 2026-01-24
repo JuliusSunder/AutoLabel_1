@@ -105,6 +105,35 @@ export const EMAIL_PROVIDERS: EmailProviderInfo[] = [
     officialHelpUrl: 'https://support.microsoft.com/de-de/office/pop-imap-und-smtp-einstellungen-8361e398-8af4-4e97-b147-6c6c4ac95353',
   },
   {
+    id: 'icloud',
+    name: 'iCloud Mail',
+    category: 'compatible',
+    imap: {
+      host: 'imap.mail.me.com',
+      port: 993,
+      tls: true,
+    },
+    requiresAppPassword: true,
+    forwardingAvailable: false,
+    instructions: {
+      imapSetup: [
+        'IMAP ist bei iCloud Mail standardmäßig aktiv',
+        'Du brauchst ein app-spezifisches Passwort von Apple',
+      ],
+      appPassword: [
+        'Gehe zu appleid.apple.com und melde dich an',
+        'Öffne "Anmelden und Sicherheit"',
+        'Wähle "Anwendungsspezifische Passwörter"',
+        'Klicke auf "Passwort generieren" oder "+"',
+        'Gib einen Namen ein (z.B. "AutoLabel")',
+        'Kopiere das 16-stellige Passwort (xxxx-xxxx-xxxx-xxxx)',
+        'Verwende dieses Passwort in AutoLabel (nicht dein normales Apple-ID-Passwort)',
+      ],
+    },
+    notes: 'Für iCloud brauchst du immer ein app-spezifisches Passwort. 2FA muss aktiviert sein.',
+    officialHelpUrl: 'https://support.apple.com/de-de/102654',
+  },
+  {
     id: 'yahoo',
     name: 'Yahoo Mail',
     category: 'compatible',

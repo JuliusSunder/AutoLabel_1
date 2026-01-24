@@ -3,9 +3,10 @@
  * Forwards Main Process logs to Renderer Process (Browser Console)
  */
 
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 
 let mainWindow: BrowserWindow | null = null;
+const shouldForwardLogs = !app.isPackaged;
 
 /**
  * Set the main window reference for sending logs
@@ -18,6 +19,10 @@ export function setMainWindow(window: BrowserWindow | null): void {
  * Send log to renderer process
  */
 function sendToRenderer(level: 'log' | 'warn' | 'error', ...args: any[]): void {
+  if (!shouldForwardLogs) {
+    return;
+  }
+
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
     try {
       // Serialize arguments (handle circular references, functions, etc.)

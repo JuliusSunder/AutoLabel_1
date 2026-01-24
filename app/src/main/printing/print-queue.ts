@@ -6,6 +6,7 @@
 import { printPdf, getDefaultPrinter, listPrinters, clearPrinterQueue } from './printer-manager';
 import * as printJobsRepo from '../database/repositories/print-jobs';
 import * as labelsRepo from '../database/repositories/labels';
+import * as salesRepo from '../database/repositories/sales';
 import { validateLabelCreation } from '../auth/auth-manager';
 import type { PrintJob } from '../../shared/types';
 import fs from 'node:fs';
@@ -208,6 +209,11 @@ async function processPrintJob(jobId: string): Promise<void> {
       // Update item status
       printJobsRepo.updatePrintJobItemStatus(jobId, label.id, 'printed');
 
+      // Mark sale as printed (for sales history)
+      salesRepo.updateSale(label.saleId, {
+        printedAt: new Date().toISOString(),
+      });
+
       // Increment count
       printedCount++;
       printJobsRepo.incrementPrintedCount(jobId);
@@ -344,7 +350,11 @@ export async function retryPrintJob(jobId: string): Promise<void> {
  * Get all print jobs
  */
 export function getAllPrintJobs(): PrintJob[] {
-  return printJobsRepo.getAllPrintJobs();
+  const jobs = printJobsRepo.getAllPrintJobs();
+  return jobs.map((job) => ({
+    ...job,
+    labelItems: printJobsRepo.getPrintJobLabelInfos(job.id),
+  }));
 }
 
 /**

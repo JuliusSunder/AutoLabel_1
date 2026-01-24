@@ -290,12 +290,6 @@ export function EmailProviderInfoModal({
                             </div>
                           )}
                           {provider.notes && <p className="provider-notes">{provider.notes}</p>}
-                          {provider.forwardingAvailable && (
-                            <div className="provider-alternative">
-                              <strong>💡 Free Alternative:</strong> Set up email forwarding
-                              to a compatible provider (e.g., Gmail, Web.de).
-                            </div>
-                          )}
                         </div>
                       </div>
                     ))}

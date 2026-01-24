@@ -21,6 +21,7 @@ export function initializeSchema(db: Database.Database): void {
       email_id TEXT UNIQUE NOT NULL,
       date TEXT NOT NULL,
       platform TEXT,
+      printed_at TEXT,
       product_number TEXT,
       item_title TEXT,
       buyer_ref TEXT,
@@ -400,6 +401,24 @@ export function runMigrations(db: Database.Database): void {
     db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(9);
   }
 
+  // Migration 10: Add printed_at column to sales table
+  if (version < 10) {
+    console.log('[Schema] Adding printed_at column to sales table...');
+    
+    // Check if column already exists (safe migration)
+    const tableInfo = db.pragma('table_info(sales)');
+    const hasPrintedAt = tableInfo.some(
+      (col: any) => col.name === 'printed_at'
+    );
+    
+    if (!hasPrintedAt) {
+      db.exec('ALTER TABLE sales ADD COLUMN printed_at TEXT');
+      console.log('[Schema] Added printed_at column to sales table');
+    }
+    
+    db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(10);
+  }
+
   // Future migrations go here:
-  // if (version < 10) { ... }
+  // if (version < 11) { ... }
 }

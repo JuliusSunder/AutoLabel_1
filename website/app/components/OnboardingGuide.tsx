@@ -112,8 +112,8 @@ const translations: Record<Language, Translations> = {
         },
       },
       {
-        title: "Schritt 2: Email-Account verbinden",
-        description: "Verbinde dein Email-Postfach, damit AutoLabel deine Versandetiketten automatisch erkennen kann.",
+        title: "Schritt 2: Email-Account oder Ordner hinzufügen",
+        description: "Verbinde dein Email-Postfach oder füge einen überwachten Ordner hinzu, damit AutoLabel deine Versandetiketten automatisch erkennen kann.",
         details: {
           welcome: { intro: "", whatYouNeed: "", item1: "", item2: "", item3: "" },
           download: { installation: "", step1: "", step2: "", step3: "", step4: "", warningNoPassword: "", loginInfo: "" },
@@ -132,7 +132,7 @@ const translations: Record<Language, Translations> = {
       },
       {
         title: "Schritt 3: Ersten Scan durchführen",
-        description: "Scanne dein Email-Postfach nach Versandetiketten und drucke dein erstes Label!",
+        description: "Scanne deine Emails und Ordner nach Versandetiketten und drucke dein erstes Label!",
         details: {
           welcome: { intro: "", whatYouNeed: "", item1: "", item2: "", item3: "" },
           download: { installation: "", step1: "", step2: "", step3: "", step4: "", warningNoPassword: "", loginInfo: "" },
@@ -140,7 +140,7 @@ const translations: Record<Language, Translations> = {
           scan: {
             scanAndPrint: "Label scannen und drucken:",
             step1: "Gehe zu \"History\" (linke Sidebar)",
-            step2: "Klicke auf \"Scan Now\" um deine Emails nach Versandetiketten zu durchsuchen",
+            step2: "Klicke auf \"Scan Now\" um deine Emails und Ordner nach Versandetiketten zu durchsuchen",
             step3: "Gefundene Labels werden automatisch angezeigt",
             step4: "Wähle ein oder mehrere Labels aus (Checkbox)",
             step5: "Klicke auf \"Quick Start\" für sofortigen Druck oder \"Prepare Labels\" für Vorschau",
@@ -196,8 +196,8 @@ const translations: Record<Language, Translations> = {
         },
       },
       {
-        title: "Step 2: Connect Email Account",
-        description: "Connect your email inbox so AutoLabel can automatically detect your shipping labels.",
+        title: "Step 2: Add Email Account or Folder",
+        description: "Connect your email inbox or add a watched folder so AutoLabel can automatically detect your shipping labels.",
         details: {
           welcome: { intro: "", whatYouNeed: "", item1: "", item2: "", item3: "" },
           download: { installation: "", step1: "", step2: "", step3: "", step4: "", warningNoPassword: "", loginInfo: "" },
@@ -216,7 +216,7 @@ const translations: Record<Language, Translations> = {
       },
       {
         title: "Step 3: Perform First Scan",
-        description: "Scan your email inbox for shipping labels and print your first label!",
+        description: "Scan your emails and folders for shipping labels and print your first label!",
         details: {
           welcome: { intro: "", whatYouNeed: "", item1: "", item2: "", item3: "" },
           download: { installation: "", step1: "", step2: "", step3: "", step4: "", warningNoPassword: "", loginInfo: "" },
@@ -224,7 +224,7 @@ const translations: Record<Language, Translations> = {
           scan: {
             scanAndPrint: "Scan and print labels:",
             step1: "Go to \"History\" (left sidebar)",
-            step2: "Click \"Scan Now\" to search your emails for shipping labels",
+            step2: "Click \"Scan Now\" to search your emails and folders for shipping labels",
             step3: "Found labels will be displayed automatically",
             step4: "Select one or more labels (checkbox)",
             step5: "Click \"Quick Start\" for immediate printing or \"Prepare Labels\" for preview",

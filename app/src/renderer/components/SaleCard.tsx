@@ -67,9 +67,20 @@ export function SaleCard({ sale, selected, onToggleSelect, disabled }: SaleCardP
 
         <div className="sale-status">
           {sale.hasAttachments ? (
-            <span className="sale-status-badge has-label">
-              ✓ Shipping Label Attached
-            </span>
+            <div className="sale-status-badges">
+              <span className="sale-status-badge has-label">
+                ✓ Shipping Label Attached
+              </span>
+              {sale.printedAt ? (
+                <span className="sale-status-badge printed">
+                  ✓ Printed
+                </span>
+              ) : (
+                <span className="sale-status-badge not-printed">
+                  ⏳ Not printed
+                </span>
+              )}
+            </div>
           ) : (
             <span className="sale-status-badge no-label">
               ✗ No Shipping Label

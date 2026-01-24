@@ -39,7 +39,7 @@ export function Hero() {
             </h1>
             
             <p className="text-xl text-primary-lighter mb-8 leading-relaxed max-w-lg">
-              AutoLabel scans your emails, normalizes labels to 4×6", and prints them automatically. Save hours of manual work every day.
+              AutoLabel scans your emails and folders, normalizes labels to 4×6", and prints them automatically. Save hours of manual work every day.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">

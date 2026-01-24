@@ -199,6 +199,29 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
     }
   };
 
+  const waitForPrintCompletion = async (jobId: string) => {
+    const maxAttempts = 60;
+    const delayMs = 1000;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const job = await api.print.status(jobId);
+        if (!job) break;
+        if (job.status === 'completed' || job.status === 'failed') {
+          break;
+        }
+      } catch (err) {
+        console.warn('Failed to poll print job status:', err);
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    // Trigger sales update so History can show "Printed" after job finishes
+    window.dispatchEvent(new CustomEvent('sales:updated'));
+  };
+
   const handlePrint = async () => {
     if (preparedLabels.length === 0) return;
 
@@ -207,11 +230,12 @@ export function PrepareScreen({ selectedSaleIds, onRemoveSale }: PrepareScreenPr
 
     try {
       const labelIds = preparedLabels.map((l) => l.id);
-      await api.print.start({ labelIds, printerName: selectedPrinter });
+      const job = await api.print.start({ labelIds, printerName: selectedPrinter });
       console.log('Print job started with printer:', selectedPrinter);
       toast.success('Print job started!', {
         description: 'Note: Windows cannot reliably detect if printer is offline. Please verify the labels were printed.'
       });
+      void waitForPrintCompletion(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start printing');
       console.error('Failed to print:', err);

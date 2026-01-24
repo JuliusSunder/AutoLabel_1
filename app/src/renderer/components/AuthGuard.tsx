@@ -16,6 +16,13 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   const checkAuth = async () => {
     try {
+      const session = await window.autolabel.auth.getSession();
+      if (session) {
+        setIsAuthenticated(true);
+        return;
+      }
+
+      // Fallback to local check to avoid logging out while offline
       const authenticated = await window.autolabel.auth.isAuthenticated();
       setIsAuthenticated(authenticated);
     } catch (error) {

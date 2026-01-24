@@ -80,6 +80,32 @@ export function isShippingLabelEmail(email: EmailMessage): boolean {
     return false;
   }
 
+  // Must have attachments (PDF or image)
+  if (email.attachments.length === 0) {
+    console.log(`[Email Parser] Rejecting email (no attachments): ${subject.substring(0, 50)}...`);
+    return false;
+  }
+
+  // Special handling for Vinted emails
+  // Vinted emails have "Versandschein" in subject and "vinted" in from/body
+  // Even if carrier name is not prominent in subject
+  const isVintedEmail = (from.includes('vinted') || from.includes('kleiderkreisel')) ||
+                        (subject.includes('versandschein') && body.includes('vinted'));
+  
+  if (isVintedEmail) {
+    // For Vinted, just check for "Versandschein" and PDF attachments
+    if (subject.includes('versandschein')) {
+      const hasPdfAttachment = email.attachments.some(att => 
+        att.filename.toLowerCase().endsWith('.pdf')
+      );
+      
+      if (hasPdfAttachment) {
+        console.log(`[Email Parser] Accepting Vinted email (Versandschein + PDF): ${subject.substring(0, 50)}...`);
+        return true;
+      }
+    }
+  }
+
   // German keywords for shipping labels
   const germanLabelKeywords = [
     'versandlabel',
@@ -111,12 +137,6 @@ export function isShippingLabelEmail(email: EmailMessage): boolean {
 
   // Check if subject or body contains any positive keywords
   const hasKeyword = allKeywords.some(keyword => combinedText.includes(keyword));
-
-  // Must have attachments (PDF or image)
-  if (email.attachments.length === 0) {
-    console.log(`[Email Parser] Rejecting email (no attachments): ${subject.substring(0, 50)}...`);
-    return false;
-  }
 
   // Check if any attachment looks like a shipping label
   const hasLabelAttachment = email.attachments.some((att) => {

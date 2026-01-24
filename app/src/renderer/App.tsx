@@ -11,6 +11,7 @@ import { PrepareScreen } from './screens/PrepareScreen';
 import { PrintScreen } from './screens/PrintScreen';
 import { SettingsModal } from './components/SettingsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import type { PrinterInfo } from '../shared/types';
 import './App.css';
 
 type Screen = 'history' | 'prepare' | 'print';
@@ -19,6 +20,7 @@ export function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('history');
   const [selectedSaleIds, setSelectedSaleIds] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [cachedPrinters, setCachedPrinters] = useState<PrinterInfo[]>([]);
 
   const handleSelectSales = (saleIds: string[]) => {
     setSelectedSaleIds(saleIds);
@@ -29,6 +31,18 @@ export function App() {
     setSelectedSaleIds((prev) => prev.filter((id) => id !== saleId));
   };
 
+  // Preload printers on app mount
+  useEffect(() => {
+    const loadPrinters = async () => {
+      try {
+        const printers = await window.autolabel.print.listPrinters();
+        setCachedPrinters(printers);
+      } catch (err) {
+        console.error('Failed to preload printers:', err);
+      }
+    };
+    loadPrinters();
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -123,7 +137,11 @@ export function App() {
         </div>
       </main>
 
-      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsModal 
+        isOpen={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        cachedPrinters={cachedPrinters}
+      />
     </div>
   );
 }

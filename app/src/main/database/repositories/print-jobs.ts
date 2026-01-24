@@ -4,7 +4,7 @@
 
 import type Database from 'better-sqlite3';
 import { getDatabase, generateId } from '../db';
-import type { PrintJob, PrintJobRow } from '../../../shared/types';
+import type { PrintJob, PrintJobLabelInfo, PrintJobRow } from '../../../shared/types';
 
 /**
  * Convert database row to PrintJob object
@@ -203,6 +203,32 @@ export function getRecentPrintJobs(limit: number = 50): PrintJob[] {
     job.labelIds = getLabelIdsForJob(row.id);
     return job;
   });
+}
+
+/**
+ * Get label info for a print job (with product number)
+ */
+export function getPrintJobLabelInfos(jobId: string): PrintJobLabelInfo[] {
+  const db = getDatabase();
+  const stmt = db.prepare(`
+    SELECT 
+      pji.label_id as label_id,
+      s.product_number as product_number
+    FROM print_job_items pji
+    JOIN prepared_labels pl ON pl.id = pji.label_id
+    LEFT JOIN sales s ON s.id = pl.sale_id
+    WHERE pji.job_id = ?
+    ORDER BY pji.id
+  `);
+  const rows = stmt.all(jobId) as Array<{
+    label_id: string;
+    product_number: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    labelId: row.label_id,
+    productNumber: row.product_number || undefined,
+  }));
 }
 
 /**

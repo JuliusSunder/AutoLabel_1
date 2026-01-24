@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Pattern Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+        #canvas-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        canvas {
+            display: block;
+            border: 1px solid #ddd;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <canvas id="grid-canvas" width="1920" height="1080"></canvas>
+    </div>
+    <button id="download-btn">Bild herunterladen (PNG)</button>
+    
+    <script>
+        const canvas = document.getElementById('grid-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Weißer Hintergrund
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Grid-Einstellungen (größer: 80px statt 40px)
+        const gridSize = 80;
+        const lineColor = '#e5e7eb';
+        const lineWidth = 1;
+        
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth = lineWidth;
+        
+        // Vertikale Linien
+        for (let x = 0; x <= canvas.width; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+        
+        // Horizontale Linien
+        for (let y = 0; y <= canvas.height; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
+        
+        // Gradient-Fade am unteren Rand
+        const gradient = ctx.createLinearGradient(0, canvas.height * 0.4, 0, canvas.height);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 1)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, canvas.height * 0.4, canvas.width, canvas.height * 0.6);
+        
+        // Download-Funktion
+        function downloadImage() {
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'grid-background.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+        
+        document.getElementById('download-btn').addEventListener('click', downloadImage);
+    </script>
+</body>
+</html>

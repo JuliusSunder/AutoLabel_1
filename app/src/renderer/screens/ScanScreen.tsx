@@ -38,7 +38,7 @@ export function ScanScreen() {
 
   return (
     <div className="screen scan-screen">
-      <h2 className="screen-title">Scan Vinted Emails</h2>
+      <h2 className="screen-title">Scan for Labels</h2>
 
       <div className="card scan-info">
         <h3>🔄 Refresh Vinted Sales</h3>
@@ -62,7 +62,7 @@ export function ScanScreen() {
           <div className="scan-result" style={{ marginTop: '20px', border: '2px solid #27ae60' }}>
             <h4>✅ Scan Complete!</h4>
             <p>
-              <strong>Vinted emails checked:</strong> {result.scannedCount}
+              <strong>Items checked:</strong> {result.scannedCount}
             </p>
             <p>
               <strong>Sales imported:</strong> {result.newSales}
@@ -103,8 +103,8 @@ export function ScanScreen() {
       <div className="card scan-info">
         <h3>💡 How It Works</h3>
         <p>
-          The scanner reads the email body text where Vinted includes shipping instructions.
-          These instructions mention the carrier (e.g., "Bringe dein Paket zu einem Hermes PaketShop").
+          The scanner reads emails and scans folders for shipping label files.
+          For Vinted emails, it reads the body text where shipping instructions mention the carrier (e.g., "Bringe dein Paket zu einem Hermes PaketShop").
         </p>
         <p style={{ marginTop: '10px' }}>
           After scanning, go to the <strong>History</strong> tab to see your sales and select which ones to prepare for printing.

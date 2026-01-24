@@ -21,6 +21,7 @@ function rowToSale(row: SaleRow): Sale {
     buyerRef: row.buyer_ref || undefined,
     metadata: row.metadata_json ? JSON.parse(row.metadata_json) : undefined,
     createdAt: row.created_at,
+    printedAt: row.printed_at || undefined,
     accountId: row.account_id || undefined,
     folderId: row.folder_id || undefined,
   };
@@ -37,8 +38,8 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
   const stmt = db.prepare(`
     INSERT INTO sales (
       id, email_id, date, platform, shipping_company, product_number, 
-      item_title, buyer_ref, metadata_json, created_at, account_id, folder_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      item_title, buyer_ref, metadata_json, created_at, printed_at, account_id, folder_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -52,6 +53,7 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
     data.buyerRef || null,
     data.metadata ? JSON.stringify(data.metadata) : null,
     createdAt,
+    data.printedAt || null,
     data.accountId || null,
     data.folderId || null
   );
@@ -68,6 +70,7 @@ export function createSale(data: Omit<Sale, 'id' | 'createdAt'>): Sale {
     buyerRef: data.buyerRef || undefined,
     metadata: data.metadata,
     createdAt,
+    printedAt: data.printedAt || undefined,
     accountId: data.accountId || undefined,
     folderId: data.folderId || undefined,
   };
@@ -128,6 +131,10 @@ export function updateSale(
   if (updates.metadata !== undefined) {
     fields.push('metadata_json = ?');
     values.push(JSON.stringify(updates.metadata));
+  }
+  if (updates.printedAt !== undefined) {
+    fields.push('printed_at = ?');
+    values.push(updates.printedAt);
   }
   
   if (fields.length === 0) {

@@ -8,8 +8,8 @@ import Image from 'next/image';
 const workflowSteps = [
   {
     icon: Mail,
-    title: 'Email Scan',
-    description: 'Scans your inboxes for shipping labels',
+    title: 'Source Scan',
+    description: 'Scans your emails and folders for shipping labels',
     number: '01'
   },
   {
@@ -36,7 +36,7 @@ const features = [
   {
     icon: Mail,
     title: 'Scan your Orders',
-    description: 'Scans your Mailbox for shipping labels via IMAP.',
+    description: 'Scans your emails (via IMAP) and folders for shipping labels.',
     hasEmailScanning: true,
   },
   {
@@ -151,7 +151,7 @@ export function PowerfulWorkflow() {
         <div className="mb-20 w-full h-px bg-gradient-to-r from-transparent to-transparent via-white/20" />
 
         {/* Features Grid */}
-        <div className="mb-16 text-center">
+        <div id="features" className="mb-16 text-center">
           <h3 className="mb-4 text-3xl font-bold text-white md:text-4xl">
             Everything You Need
           </h3>

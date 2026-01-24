@@ -264,6 +264,10 @@ export function PrintScreen() {
           <div className="print-job-list">
             {jobs.map((job) => {
               const isExpanded = expandedJobId === job.id;
+              const labelItems =
+                job.labelItems?.length
+                  ? job.labelItems
+                  : job.labelIds.map((labelId) => ({ labelId }));
               const progress =
                 job.totalCount > 0
                   ? Math.round((job.printedCount / job.totalCount) * 100)
@@ -338,10 +342,13 @@ export function PrintScreen() {
                     <div className="print-job-details">
                       <h4>Labels in this job:</h4>
                       <ul className="print-label-list">
-                        {job.labelIds.map((labelId, index) => (
-                          <li key={labelId} className="print-label-item">
+                        {labelItems.map((item, index) => (
+                          <li key={item.labelId} className="print-label-item">
                             <span>
-                              Label {index + 1}: {labelId.slice(0, 12)}...
+                              Label {index + 1}:{' '}
+                              {item.productNumber
+                                ? item.productNumber
+                                : `${item.labelId.slice(0, 12)}...`}
                             </span>
                           </li>
                         ))}

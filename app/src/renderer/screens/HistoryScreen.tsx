@@ -340,14 +340,36 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
 
       // Start printing immediately
       const labelIds = result.map((l: any) => l.id);
-      await api.print.start({ labelIds, printerName: printerToUse });
+      const job = await api.print.start({ labelIds, printerName: printerToUse });
       
       toast.success('Quick Start successful!', {
         description: `${labelIds.length} label(s) sent to ${printerToUse}`
       });
 
-      // Reload sales to update status
-      await loadSales();
+      // Wait for job completion, then reload sales to update "Printed"
+      const waitForPrintCompletion = async (jobId: string) => {
+        const maxAttempts = 60;
+        const delayMs = 1000;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            const status = await api.print.status(jobId);
+            if (!status) break;
+            if (status.status === 'completed' || status.status === 'failed') {
+              break;
+            }
+          } catch (err) {
+            console.warn('Failed to poll print job status:', err);
+            break;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+
+        await loadSales();
+      };
+
+      void waitForPrintCompletion(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Quick Start failed');
       toast.error('Quick Start failed', {
@@ -569,7 +591,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
 
         {scanResult && (
           <div className="scan-result-banner">
-            ✅ Scan complete! <strong>{scanResult.scannedCount}</strong> emails checked, <strong>{scanResult.newSales}</strong> sales imported.
+            ✅ Scan complete! <strong>{scanResult.scannedCount}</strong> items checked, <strong>{scanResult.newSales}</strong> sales imported.
             {scanResult.errors && scanResult.errors.length > 0 && (
               <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
                 ⚠️ Errors: {scanResult.errors.join(', ')}
@@ -634,7 +656,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                     { value: 'lastMonth', label: 'Last Month' },
                     { value: 'last30Days', label: 'Last 30 Days' },
                   ].map((option) => (
-                    <div key={option.value} className="flex items-center gap-2">
+                    <div key={option.value} className="flex gap-2 items-center">
                       <Checkbox
                         id={`dropdown-time-${option.value}`}
                         checked={filters.timeFilter === option.value}
@@ -649,7 +671,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                       />
                       <Label 
                         htmlFor={`dropdown-time-${option.value}`} 
-                        className="text-sm font-normal cursor-pointer flex-1"
+                        className="flex-1 text-sm font-normal cursor-pointer"
                       >
                         {option.label}
                       </Label>
@@ -673,7 +695,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
               <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
                 <div className="px-2 py-1 space-y-2">
                   {['GLS', 'Hermes', 'DHL', 'DPD', 'UPS'].map((carrier) => (
-                    <div key={carrier} className="flex items-center gap-2">
+                    <div key={carrier} className="flex gap-2 items-center">
                       <Checkbox
                         id={`dropdown-carrier-${carrier}`}
                         checked={filters.shippingCompanies.includes(carrier)}
@@ -688,7 +710,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                       />
                       <Label 
                         htmlFor={`dropdown-carrier-${carrier}`} 
-                        className="text-sm font-normal cursor-pointer flex-1"
+                        className="flex-1 text-sm font-normal cursor-pointer"
                       >
                         {carrier}
                       </Label>
@@ -711,7 +733,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
                 <div className="px-2 py-1 space-y-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2 items-center">
                     <Checkbox
                       id="dropdown-platform-vinted"
                       checked={filters.platforms.includes('Vinted/Kleiderkreisel')}
@@ -726,7 +748,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                     />
                     <Label 
                       htmlFor="dropdown-platform-vinted" 
-                      className="text-sm font-normal cursor-pointer flex-1"
+                      className="flex-1 text-sm font-normal cursor-pointer"
                     >
                       Vinted
                     </Label>
@@ -750,7 +772,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
                 <div className="px-2 py-1 space-y-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2 items-center">
                     <Checkbox
                       id="dropdown-with-label"
                       checked={filters.hasAttachments === true}
@@ -763,12 +785,12 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                     />
                     <Label 
                       htmlFor="dropdown-with-label" 
-                      className="text-sm font-normal cursor-pointer flex-1"
+                      className="flex-1 text-sm font-normal cursor-pointer"
                     >
                       Mit Label
                     </Label>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2 items-center">
                     <Checkbox
                       id="dropdown-without-label"
                       checked={filters.hasAttachments === false}
@@ -781,7 +803,7 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
                     />
                     <Label 
                       htmlFor="dropdown-without-label" 
-                      className="text-sm font-normal cursor-pointer flex-1"
+                      className="flex-1 text-sm font-normal cursor-pointer"
                     >
                       Ohne Label
                     </Label>
@@ -829,11 +851,11 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
           </div>
         )}
 
-        {!loading && !error && accounts.length === 0 && (
+        {!loading && !error && accounts.length === 0 && folders.length === 0 && (
           <EmptyState
             icon={<Mail size={64} />}
-            title="No email accounts configured"
-            description="Add an email account to start scanning for shipping labels"
+            title="No email accounts or folders configured"
+            description="Add an email account or folder to start scanning for shipping labels"
             action={
               <button className="btn btn-primary" onClick={handleAddAccount}>
                 Add Account
@@ -842,17 +864,17 @@ export function HistoryScreen({ onSelectSales }: HistoryScreenProps) {
           />
         )}
 
-        {!loading && !error && accounts.length > 0 && sales.length === 0 && (
+        {!loading && !error && (accounts.length > 0 || folders.length > 0) && sales.length === 0 && (
           <EmptyState
             icon={<Inbox size={64} />}
             title="No sales found"
             description={
-              selectedAccountId
-                ? 'No sales for this account. Try selecting a different account or scan for new emails.'
-                : 'Start scanning your emails to find shipping labels'
+              selectedAccountId || selectedFolderId
+                ? 'No sales for this source. Try selecting a different source or scan for new labels.'
+                : 'Start scanning your sources to find shipping labels'
             }
             action={
-              accounts.length > 0 && (
+              (accounts.length > 0 || folders.length > 0) && (
                 <button className="btn btn-primary" onClick={handleScan} disabled={isScanning}>
                   {isScanning ? 'Scanning...' : 'Start Scan'}
                 </button>

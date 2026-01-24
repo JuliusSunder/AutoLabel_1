@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAutolabel } from '../hooks/useAutolabel';
-import { X, Printer, Clock, FileText, Lock, User } from 'lucide-react';
+import { X, Printer, Calendar, FileText, Lock, User } from 'lucide-react';
 import type { PrinterInfo, FooterConfig } from '../../shared/types';
 import { AccountStatus } from './AccountStatus';
 import './SettingsModal.css';
@@ -13,26 +13,31 @@ import './SettingsModal.css';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  cachedPrinters?: PrinterInfo[];
 }
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, cachedPrinters = [] }: SettingsModalProps) {
   const api = useAutolabel();
-  const [printers, setPrinters] = useState<PrinterInfo[]>([]);
+  const [printers, setPrinters] = useState<PrinterInfo[]>(cachedPrinters);
   const [defaultPrinter, setDefaultPrinter] = useState<string>('');
-  const [autoScanEnabled, setAutoScanEnabled] = useState<boolean>(false);
-  const [autoScanInterval, setAutoScanInterval] = useState<number>(30);
+  const [scanDays, setScanDays] = useState<number>(30);
   const [defaultFooterConfig, setDefaultFooterConfig] = useState<FooterConfig>({
     includeProductNumber: true,
     includeItemTitle: false,
     includeDate: true,
   });
-  const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [canCustomFooter, setCanCustomFooter] = useState<boolean>(true); // License check
 
-  // Load settings from localStorage on mount
+  // Update printers when cachedPrinters prop changes
+  useEffect(() => {
+    if (cachedPrinters.length > 0) {
+      setPrinters(cachedPrinters);
+    }
+  }, [cachedPrinters]);
+
+  // Load settings only once on first open
   useEffect(() => {
     if (isOpen) {
-      loadPrinters();
       loadSettings();
       checkLicense();
     }
@@ -50,34 +55,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
-  const loadPrinters = async () => {
-    setLoadingPrinters(true);
-    try {
-      const result = await api.print.listPrinters();
-      setPrinters(result);
-    } catch (err) {
-      console.error('Failed to load printers:', err);
-    } finally {
-      setLoadingPrinters(false);
-    }
-  };
-
-  const loadSettings = () => {
+  const loadSettings = async () => {
     // Load default printer
     const savedPrinter = localStorage.getItem('defaultPrinter');
     if (savedPrinter) {
       setDefaultPrinter(savedPrinter);
     }
 
-    // Load auto-scan settings
-    const savedAutoScanEnabled = localStorage.getItem('autoScanEnabled');
-    if (savedAutoScanEnabled !== null) {
-      setAutoScanEnabled(savedAutoScanEnabled === 'true');
-    }
-
-    const savedAutoScanInterval = localStorage.getItem('autoScanInterval');
-    if (savedAutoScanInterval) {
-      setAutoScanInterval(parseInt(savedAutoScanInterval, 10));
+    // Load scan days from config
+    try {
+      const config = await api.config.get();
+      setScanDays(config.scanDays || 30);
+    } catch (err) {
+      console.error('Failed to load scan days from config:', err);
+      setScanDays(30); // Fallback to default
     }
 
     // Load default footer config
@@ -96,15 +87,31 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     localStorage.setItem('defaultPrinter', printerName);
   };
 
-  const handleAutoScanEnabledChange = (enabled: boolean) => {
-    setAutoScanEnabled(enabled);
-    localStorage.setItem('autoScanEnabled', enabled.toString());
-  };
-
-  const handleAutoScanIntervalChange = (interval: number) => {
-    const clampedInterval = Math.max(1, Math.min(1440, interval));
-    setAutoScanInterval(clampedInterval);
-    localStorage.setItem('autoScanInterval', clampedInterval.toString());
+  const handleScanDaysChange = async (value: string) => {
+    // Parse the input value
+    const parsed = parseInt(value, 10);
+    
+    // If empty or invalid, set to 1
+    if (value === '' || isNaN(parsed) || parsed < 1) {
+      setScanDays(1);
+      try {
+        await api.config.set({ scanDays: 1 });
+      } catch (err) {
+        console.error('Failed to save scan days to config:', err);
+      }
+      return;
+    }
+    
+    // Validate: min=1, max=365
+    const validatedDays = Math.max(1, Math.min(365, parsed));
+    setScanDays(validatedDays);
+    
+    try {
+      await api.config.set({ scanDays: validatedDays });
+      console.log('Scan days saved to config:', validatedDays);
+    } catch (err) {
+      console.error('Failed to save scan days to config:', err);
+    }
   };
 
   const handleFooterConfigChange = (field: keyof FooterConfig, value: boolean) => {
@@ -113,7 +120,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     localStorage.setItem('defaultFooterConfig', JSON.stringify(newConfig));
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only close if clicking directly on the backdrop (not on modal content)
     if (e.target === e.currentTarget) {
       onClose();
     }
@@ -136,7 +144,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       aria-modal="true"
       aria-labelledby="settings-modal-title"
     >
-      <div className="settings-modal">
+      <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="settings-modal-header">
           <h2 id="settings-modal-title">Settings</h2>
           <button
@@ -167,9 +175,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <p className="settings-section-description">
               Select the default printer to use when preparing labels
             </p>
-            {loadingPrinters ? (
-              <p className="settings-loading">Loading printers...</p>
-            ) : printers.length === 0 ? (
+            {printers.length === 0 ? (
               <p className="settings-empty">No printers found</p>
             ) : (
               <select
@@ -188,42 +194,41 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             )}
           </div>
 
-          {/* Auto-Scan Interval */}
+          {/* Scan Time Period */}
           <div className="settings-section">
             <div className="settings-section-header">
-              <Clock size={20} />
-              <h3>Auto-Scan</h3>
+              <Calendar size={20} />
+              <h3>Scan Time Period</h3>
             </div>
             <p className="settings-section-description">
-              Automatically scan for new emails at regular intervals
+              Scan emails from the last X days
             </p>
-            <label className="settings-toggle-label">
+            <div className="settings-input-group">
+              <label htmlFor="scan-days">Days:</label>
               <input
-                type="checkbox"
-                checked={autoScanEnabled}
-                onChange={(e) => handleAutoScanEnabledChange(e.target.checked)}
-                aria-label="Enable auto-scan"
+                id="scan-days"
+                type="number"
+                min="1"
+                max="365"
+                step="1"
+                value={scanDays}
+                onChange={(e) => handleScanDaysChange(e.target.value)}
+                onBlur={(e) => {
+                  // Ensure minimum value on blur
+                  if (e.target.value === '' || parseInt(e.target.value, 10) < 1) {
+                    handleScanDaysChange('1');
+                  }
+                }}
+                className="settings-input"
+                aria-label="Scan time period in days"
               />
-              <span>Enable auto-scan</span>
-            </label>
-            {autoScanEnabled && (
-              <div className="settings-input-group">
-                <label htmlFor="auto-scan-interval">Interval (minutes):</label>
-                <input
-                  id="auto-scan-interval"
-                  type="number"
-                  min="1"
-                  max="1440"
-                  value={autoScanInterval}
-                  onChange={(e) => handleAutoScanIntervalChange(parseInt(e.target.value, 10) || 1)}
-                  className="settings-input"
-                  aria-label="Auto-scan interval in minutes"
-                />
-                <span className="settings-input-hint">
-                  {autoScanInterval === 1 ? '1 minute' : `${autoScanInterval} minutes`}
-                </span>
-              </div>
-            )}
+              <span className="settings-input-hint">
+                {scanDays === 1 ? '1 day' : `${scanDays} days`}
+              </span>
+            </div>
+            <p className="settings-input-hint" style={{ marginTop: '8px', fontSize: '12px', opacity: 0.7 }}>
+              💡 Recommended: 1-30 days for best performance
+            </p>
           </div>
 
           {/* Default Footer Settings */}

@@ -6,6 +6,8 @@ import { getDatabase, closeDatabase } from './main/database/db';
 import { registerAllHandlers } from './main/ipc/handlers';
 import { logError, logInfo, logWarning, clearOldLogs, initializeLoggerExplicit } from './main/utils/logger';
 import { setMainWindow } from './main/utils/renderer-logger';
+import { startTokenRefresher } from './main/auth/token-refresher';
+import { hasTokens } from './main/auth/token-storage';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -116,6 +118,17 @@ app.on('ready', () => {
   } catch (error) {
     console.error('[Main] Failed to register IPC handlers:', error);
     logError('Failed to register IPC handlers', error);
+  }
+
+  // Start token refresher if tokens exist (keeps login across restarts)
+  try {
+    if (hasTokens()) {
+      startTokenRefresher();
+      logInfo('Token refresher started on app launch');
+    }
+  } catch (error) {
+    console.error('[Main] Failed to start token refresher:', error);
+    logError('Failed to start token refresher', error);
   }
 
   // Create main window

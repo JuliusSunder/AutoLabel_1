@@ -18,6 +18,7 @@ export interface Sale {
   buyerRef?: string;
   metadata?: Record<string, any>; // Flexible storage for extra fields
   createdAt: string; // ISO timestamp
+  printedAt?: string; // ISO timestamp when label was printed
   hasAttachments?: boolean; // Whether sale has label attachments
   accountId?: string; // Email account this sale came from
   folderId?: string; // Watched folder this sale came from
@@ -68,12 +69,18 @@ export interface PrintJob {
   id: string;
   printerName: string;
   labelIds: string[];
+  labelItems?: PrintJobLabelInfo[];
   status: 'pending' | 'printing' | 'completed' | 'failed';
   printedCount: number;
   totalCount: number;
   errors?: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PrintJobLabelInfo {
+  labelId: string;
+  productNumber?: string;
 }
 
 export interface PrintJobItem {
@@ -276,6 +283,7 @@ export interface SaleRow {
   buyer_ref: string | null;
   metadata_json: string | null;
   created_at: string;
+  printed_at: string | null;
   account_id: string | null;
   folder_id: string | null;
 }

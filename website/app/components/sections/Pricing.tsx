@@ -20,7 +20,6 @@ const pricingPlans = [
     ],
     limitations: [
       'No custom footer',
-      'Limited to 10 labels/month',
     ],
     cta: 'Get Started',
     priceId: null,
@@ -210,11 +209,11 @@ export function Pricing() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-start">
           {pricingPlans.map((plan, index) => (
             <div
               key={index}
-              className={`bg-white rounded-lg p-8 ${
+              className={`bg-white rounded-lg p-8 flex flex-col ${
                 plan.popular && currentPlan !== plan.name.toLowerCase()
                   ? 'ring-2 ring-vinted shadow-xl scale-105'
                   : currentPlan === plan.name.toLowerCase()
@@ -243,25 +242,31 @@ export function Pricing() {
                 <h3 className="text-2xl font-bold text-primary mb-2">
                   {plan.name}
                 </h3>
-                <p className="text-sm text-primary-lighter mb-4">
+                <p className="text-sm text-primary-lighter mb-4 min-h-[40px]">
                   {plan.description}
                 </p>
-                <div className="flex items-baseline justify-center">
-                  <span className="text-4xl font-bold text-primary">
-                    €{plan.price[billingPeriod].toFixed(2)}
-                  </span>
-                  <span className="text-primary-lighter ml-2">
-                    /{billingPeriod === 'monthly' ? 'month' : 'year'}
-                  </span>
+                <div className="h-[80px] flex items-center justify-center">
+                  <div>
+                    <div className="flex items-baseline justify-center">
+                      <span className="text-4xl font-bold text-primary">
+                        €{plan.price[billingPeriod].toFixed(2)}
+                      </span>
+                      <span className="text-primary-lighter ml-2">
+                        /month
+                      </span>
+                    </div>
+                    <div className="h-[20px] flex items-center justify-center">
+                      {billingPeriod === 'yearly' && plan.price.yearly > 0 && (
+                        <p className="text-xs text-vinted">
+                          €{(plan.price.yearly * 12).toFixed(2)} billed annually
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {billingPeriod === 'yearly' && plan.price.yearly > 0 && (
-                  <p className="text-xs text-vinted mt-1">
-                    €{(plan.price.yearly * 12).toFixed(2)} billed annually
-                  </p>
-                )}
               </div>
 
-              <ul className="space-y-3 mb-8">
+              <ul className="space-y-3 mb-8 flex-grow">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-start">
                     <Check className="h-5 w-5 text-vinted mr-3 flex-shrink-0 mt-0.5" />
@@ -278,6 +283,7 @@ export function Pricing() {
               </ul>
 
               {/* Button oder Status-Anzeige */}
+              <div className="mt-auto">
               {(() => {
                 const planNameLower = plan.name.toLowerCase();
                 const isCurrentPlan = currentPlan === planNameLower;
@@ -293,6 +299,7 @@ export function Pricing() {
                   // User hat bereits diesen Plan
                   return (
                     <div className="w-full">
+                      <div className="min-h-[80px] mb-2"></div>
                       <Button
                         variant="outline"
                         className="w-full bg-green-50 border-green-500 text-green-700 hover:bg-green-100 cursor-default"
@@ -309,11 +316,13 @@ export function Pricing() {
                   // Downgrade nicht erlaubt
                   return (
                     <div className="w-full">
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
-                        <div className="flex items-start gap-2">
-                          <Info className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                          <div className="text-xs text-gray-600">
-                            <p>Downgrade not possible. You can only upgrade to a higher plan.</p>
+                      <div className="min-h-[80px] mb-2 flex items-start">
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 w-full">
+                          <div className="flex items-start gap-2">
+                            <Info className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                            <div className="text-xs text-gray-600">
+                              <p>Downgrade not possible. You can only upgrade to a higher plan.</p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -332,12 +341,14 @@ export function Pricing() {
                   // Upgrade von Plus auf Pro mit Erstattungshinweis
                   return (
                     <div className="w-full space-y-3">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-                        <div className="flex items-start gap-2">
-                          <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                          <div className="text-xs text-blue-800">
-                            <p className="font-semibold mb-1">Upgrade Bonus:</p>
-                            <p>You will receive an automatic refund for the unused portion of your Plus plan. The refund is calculated based on the days already used.</p>
+                      <div className="min-h-[80px] mb-2 flex items-start">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 w-full">
+                          <div className="flex items-start gap-2">
+                            <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-xs text-blue-800">
+                              <p className="font-semibold mb-1">Upgrade Bonus:</p>
+                              <p>You will receive an automatic refund for the unused portion of your Plus plan. The refund is calculated based on the days already used.</p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -376,22 +387,26 @@ export function Pricing() {
                 
                 // Normale Checkout-Button
                 return (
-                  <Button
-                    variant={plan.popular ? 'primary' : 'outline'}
-                    className="w-full"
-                    onClick={() => {
-                      const selectedPriceId = plan.priceId 
-                        ? (billingPeriod === 'monthly' ? plan.priceId.monthly : plan.priceId.yearly) || null
-                        : null;
-                      console.log('Button clicked:', { plan: plan.name, selectedPriceId, billingPeriod });
-                      handleCheckout(selectedPriceId, plan.name);
-                    }}
-                    disabled={!!(isLoading || (plan.priceId && isAuthenticated !== true))}
-                  >
-                    {isLoading ? 'Loading...' : plan.cta}
-                  </Button>
+                  <div className="w-full">
+                    <div className="min-h-[80px] mb-2"></div>
+                    <Button
+                      variant={plan.popular ? 'primary' : 'outline'}
+                      className="w-full"
+                      onClick={() => {
+                        const selectedPriceId = plan.priceId 
+                          ? (billingPeriod === 'monthly' ? plan.priceId.monthly : plan.priceId.yearly) || null
+                          : null;
+                        console.log('Button clicked:', { plan: plan.name, selectedPriceId, billingPeriod });
+                        handleCheckout(selectedPriceId, plan.name);
+                      }}
+                      disabled={!!(isLoading || (plan.priceId && isAuthenticated !== true))}
+                    >
+                      {isLoading ? 'Loading...' : plan.cta}
+                    </Button>
+                  </div>
                 );
               })()}
+              </div>
             </div>
           ))}
         </div>

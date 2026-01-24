@@ -18,6 +18,7 @@ import { scanAllFolders } from '../folder/folder-scanner';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ScanResult, EmailAccount } from '../../shared/types';
+import { isVintedEmail, parseVintedEmail } from './parsers/vinted-parser';
 
 /**
  * Scan a single email account
@@ -76,8 +77,29 @@ async function scanSingleAccount(account: EmailAccount, scanDays: number): Promi
           continue;
         }
 
-        // Try to extract sale from email
-        const parsedSale = processEmail(email);
+        // Check if this is a Vinted email and use specialized parser
+        let parsedSale = null;
+        if (isVintedEmail(email)) {
+          console.log(`[Scanner] Detected Vinted email, using specialized parser`);
+          const vintedResult = parseVintedEmail(email);
+          
+          // Convert Vinted result to ParsedSale format
+          parsedSale = {
+            emailId: email.messageId,
+            date: email.date.toISOString().split('T')[0], // YYYY-MM-DD for SQLite
+            platform: 'Vinted',
+            shippingCompany: vintedResult.carrier || undefined,
+            productNumber: vintedResult.productNumber,
+            itemTitle: vintedResult.itemTitle,
+            buyerRef: undefined,
+            metadata: {
+              instructions: vintedResult.instructions,
+            },
+          };
+        } else {
+          // Try generic email processing
+          parsedSale = processEmail(email);
+        }
 
         if (parsedSale) {
           // First, try to save attachments to see if there are any valid ones

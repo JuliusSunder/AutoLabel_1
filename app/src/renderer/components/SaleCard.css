@@ -129,6 +129,13 @@
   border-top: 1px solid #ecf0f1;
 }
 
+.sale-status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .sale-status-badge {
   display: inline-block;
   padding: 0.4rem 0.75rem;
@@ -149,3 +156,14 @@
   border: 1px solid #f5c6cb;
 }
 
+.sale-status-badge.printed {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.sale-status-badge.not-printed {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
